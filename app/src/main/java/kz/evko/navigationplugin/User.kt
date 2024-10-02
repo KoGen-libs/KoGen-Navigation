@@ -35,7 +35,7 @@ class Users {
 
 @GenerateScreens
 @Composable
-fun UserProfileScreen() {
+fun UserProfileScreen(navController: NavHostController,) {
 
 }
 
@@ -54,7 +54,7 @@ fun SplashScreen(
     text: String,
     myFirstParamNumber: Int,
     list: Array<Boolean>,
-    viewModel: SplashViewMod// = koinViewModel(),
+   // viewModel: SplashViewMod// = koinViewModel(),
 ) {
 
 }
