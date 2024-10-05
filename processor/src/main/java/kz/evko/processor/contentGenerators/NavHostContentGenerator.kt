@@ -2,7 +2,8 @@ package kz.evko.processor.contentGenerators
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
-import kz.evko.annotation.GenerateScreens
+import kz.evko.processor.annotation.GenerateScreens
+import kz.evko.processor.annotation.ViewModelInjector
 import kz.evko.processor.annotationParameterByName
 import kz.evko.processor.kspPackage
 import kz.evko.processor.replaceScreenWord
@@ -41,7 +42,7 @@ class NavHostContentGenerator {
                     )
                     appendLine("\t\t\targuments = listOf(")
                     params.forEach { parameter ->
-                        appendLine(parameter.getNavArg())
+                        appendLine(ArgumentTypes.getNavArgsString(parameter))
                     }
                     appendLine("\t\t\t)")
 
@@ -53,7 +54,7 @@ class NavHostContentGenerator {
                 } else {
                     appendLine("\t\t\t${it.simpleName.asString()}(")
 
-                    append(generateScreenParameters(it.parameters))
+                    append(generateScreenParameters(it))
 
                     appendLine("\t\t\t)")
                 }
@@ -64,20 +65,33 @@ class NavHostContentGenerator {
             appendLine("}")
         }
 
-    private fun generateImports(functionList: List<KSFunctionDeclaration>) = buildString {
-        appendLine("import androidx.compose.runtime.Composable")
-        appendLine("import androidx.compose.ui.Modifier")
-        appendLine("import androidx.navigation.NavHostController")
-        appendLine("import androidx.navigation.NavType")
-        appendLine("import androidx.navigation.compose.NavHost")
-        appendLine("import androidx.navigation.compose.composable")
-        appendLine("import androidx.navigation.navArgument")
-        appendLine("import com.google.gson.Gson")
+    private fun generateImports(functionList: List<KSFunctionDeclaration>): String {
+        val injectors: MutableMap<ViewModelInjector, String> = mutableMapOf()
 
-        functionList.forEach {
-            appendLine("import ${it.packageName.asString()}.${it.simpleName.asString()}")
+        return buildString {
+            appendLine("import androidx.compose.runtime.Composable")
+            appendLine("import androidx.compose.ui.Modifier")
+            appendLine("import androidx.navigation.NavHostController")
+            appendLine("import androidx.navigation.NavType")
+            appendLine("import androidx.navigation.compose.NavHost")
+            appendLine("import androidx.navigation.compose.composable")
+            appendLine("import androidx.navigation.navArgument")
+            appendLine("import com.google.gson.Gson")
+
+            functionList.forEach {
+                appendLine("import ${it.packageName.asString()}.${it.simpleName.asString()}")
+                val type = it.getViewModelInjectorType()
+                injectors[type] = type.getInjectorImport()
+            }
+
+            injectors.forEach {
+                if (it.key != ViewModelInjector.NONE) {
+                    appendLine(it.value)
+                }
+            }
+
+            append("\n")
         }
-        append("\n")
     }
 
     private fun generateNavHostFunction(
@@ -85,7 +99,7 @@ class NavHostContentGenerator {
         hostName: String
     ) = buildString {
         val startDestination = functionList.firstOrNull {
-            it.annotationParameterByName(
+            it.annotationParameterByName<Boolean>(
                 GenerateScreens::class, "startDestination"
             )
         } ?: functionList.first()
@@ -105,105 +119,48 @@ class NavHostContentGenerator {
         appendLine("\t) {")
     }
 
-    private fun generateScreenParameters(parameters: List<KSValueParameter>) = buildString {
-        parameters.forEach { parameter ->
+    private fun generateScreenParameters(function: KSFunctionDeclaration) = buildString {
+        function.parameters.forEach { parameter ->
             when {
                 parameter.isNavHostController() ->
                     appendLine("\t\t\t\t${parameter.name?.asString()} = navController,")
 
-                parameter.isViewModel() -> appendLine("\t\t\t\t${parameter.name?.asString()} = koinViewModel<${parameter.type}>(),")
+                parameter.isViewModel() -> {
+                    val viewModelInjector = function.getViewModelInjectorType()
+
+                    if (viewModelInjector != ViewModelInjector.NONE) {
+                        appendLine(
+                            "\t\t\t\t${parameter.name?.asString()}${
+                                viewModelInjector.getInjectorName(
+                                    parameter.type.toString()
+                                )
+                            }"
+                        )
+                    }
+                }
+
                 else ->
-                    appendLine("\t\t\t\t${parameter.name?.asString()} = ${parameter.getArgumentString()},")
+                    appendLine(
+                        "\t\t\t\t${parameter.name?.asString()} = ${
+                            ArgumentTypes.getArgumentString(
+                                parameter
+                            )
+                        },"
+                    )
             }
         }
     }
 }
 
-fun KSValueParameter.getArgumentString(): String {
-    val name = name?.asString()
-    return when (type.resolve().toString()) {
-        "Boolean" -> "it.arguments?.getBoolean(\"$name\") ?: false"
-        "String" -> "it.arguments?.getString(\"$name\").orEmpty()"
-        "Int" -> "it.arguments?.getInt(\"$name\") ?: 0"
-        "Long" -> "it.arguments?.getLong(\"$name\") ?: 0"
-        "Float" -> "it.arguments?.getFloat(\"$name\") ?: 0"
-        "BooleanArray" -> "it.arguments?.getBooleanArray(\"$name\") ?: booleanArrayOf()"
-        "Array<Boolean>" -> "it.arguments?.getBooleanArray(\"$name\")?.toTypedArray() ?: arrayOf()"
-        "List<Boolean>" -> "it.arguments?.getBooleanArray(\"$name\")?.toList() ?: listOf()"
-        "Array<String>" -> "it.arguments?.getStringArray(\"$name\") ?: arrayOf()"
-        "List<String>" -> "it.arguments?.getStringArray(\"$name\")?.toList() ?: listOf()"
-        "IntArray" -> "it.arguments?.getIntArray(\"$name\")"
-        "Array<Int>" -> "it.arguments?.getIntArray(\"$name\")?.toTypedArray() ?: arrayOf()"
-        "List<Int>" -> "it.arguments?.getIntArray(\"$name\")?.toList() ?: listOf()"
-        "LongArray" -> "it.arguments?.getLongArray(\"$name\")"
-        "Array<Long>" -> "it.arguments?.getLongArray(\"$name\")?.toTypedArray() ?: arrayOf()"
-        "List<Long>" -> "it.arguments?.getLongArray(\"$name\")?.toList() ?: listOf()"
-        "FloatArray" -> "it.arguments?.getFloatArray(\"$name\")"
-        "Array<Float>" -> "it.arguments?.getFloatArray(\"$name\")?.toTypedArray() ?: arrayOf()"
-        "List<Float>" -> "it.arguments?.getFloatArray(\"$name\")?.toList() ?: listOf()"
-        else -> {
-            "Gson().fromJson(it.arguments?.getString(\"$name\").orEmpty(), ${type}::class.java)"
-        }
-    }
-}
-
-fun KSValueParameter.getNavArg(): String {
-    val argDefaultValue: String
-    val argType: String
-
-    when (type.resolve().toString()) {
-        "Boolean" -> {
-            argDefaultValue = "false"
-            argType = "NavType.BoolType"
-        }
-        "String" -> {
-            argDefaultValue = "\"\""
-            argType = "NavType.StringType"
-        }
-        "Int" -> {
-            argDefaultValue = "0"
-            argType = "NavType.IntType"
-        }
-        "Long" -> {
-            argDefaultValue = "0"
-            argType = "NavType.LongType"
-        }
-        "Float" -> {
-            argDefaultValue = "0"
-            argType = "NavType.FloatType"
-        }
-        "BooleanArray", "Array<Boolean>", "List<Boolean>" -> {
-            argDefaultValue = "booleanArrayOf()"
-            argType = "NavType.BoolArrayType"
-        }
-        "Array<String>", "List<String>" -> {
-            argDefaultValue = "arrayOf()"
-            argType = "NavType.StringArrayType"
-        }
-        "IntArray", "Array<Int>", "List<Int>" -> {
-            argDefaultValue = "intArrayOf()"
-            argType = "NavType.IntArrayType"
-        }
-        "LongArray", "Array<Long>", "List<Long>" -> {
-            argDefaultValue = "longArrayOf()"
-            argType = "NavType.LongArrayType"
-        }
-        "FloatArray", "Array<Float>", "List<Float>" -> {
-            argDefaultValue = "floatArrayOf()"
-            argType = "NavType.FloatArrayType"
-        }
-        else -> {
-            argDefaultValue = "\"\""
-            argType = "NavType.StringType"
-        }
-    }
-
-    return buildString {
-        appendLine("\t\t\t\tnavArgument(\"${name?.asString()}\") {")
-        appendLine("\t\t\t\t\tdefaultValue = $argDefaultValue")
-        appendLine("\t\t\t\t\ttype = $argType")
-        append("\t\t\t\t},")
-    }
+fun KSFunctionDeclaration.getViewModelInjectorType(): ViewModelInjector {
+    val viewModelInjectorName = "viewModelInjector"
+    val injectorType = this.annotationParameterByName(
+        GenerateScreens::class,
+        viewModelInjectorName,
+    )
+    return ViewModelInjector.entries.firstOrNull {
+        it.name == injectorType
+    } ?: ViewModelInjector.NONE
 }
 
 fun KSValueParameter.isNavHostController(): Boolean {

@@ -14,6 +14,5 @@ sourceSets.main {
 }
 
 dependencies{
-    implementation(project(":annotation"))
     implementation(libs.symbol.processing.api.v18211011)
 }

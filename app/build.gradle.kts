@@ -55,7 +55,6 @@ dependencies {
     implementation(libs.koin)
     implementation(libs.gson)
 
-    implementation(project(":annotation"))
     implementation(project(":processor"))
     ksp(project(":processor"))
 }

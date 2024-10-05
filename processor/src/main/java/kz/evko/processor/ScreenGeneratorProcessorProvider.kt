@@ -6,27 +6,25 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import com.google.devtools.ksp.symbol.KSNode
 import com.google.devtools.ksp.validate
-import com.google.devtools.ksp.visitor.KSEmptyVisitor
-import kz.evko.annotation.GenerateRouteActions
-import kz.evko.annotation.GenerateScreens
+import kz.evko.processor.annotation.GenerateScreens
 import kotlin.reflect.KClass
 
 class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
-        val fileWriter = FileWriter(environment.codeGenerator)
+        val fileWriter = FileWriter(environment.codeGenerator, environment.logger)
         return ScreenGeneratorProcessor(fileWriter)
     }
 }
 
-internal class ScreenGeneratorProcessor(private val fileGenerator: FileWriter) : SymbolProcessor {
+internal class ScreenGeneratorProcessor(
+    private val fileGenerator: FileWriter,
+) : SymbolProcessor {
     private val navHostName = "navHostName"
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val screenFunctions: Sequence<KSFunctionDeclaration> =
             resolver.findAnnotations(GenerateScreens::class)
-        val routeActions = resolver.findAnnotations(GenerateRouteActions::class)
 
         if (!screenFunctions.iterator().hasNext()) return emptyList()
 
@@ -49,21 +47,4 @@ internal class ScreenGeneratorProcessor(private val fileGenerator: FileWriter) :
         kClass.qualifiedName.toString()
     )
         .filterIsInstance<KSFunctionDeclaration>()
-}
-
-class ScreenGenerateVisitor : KSEmptyVisitor<Unit, ProcessedFunction?>() {
-
-    override fun defaultHandler(node: KSNode, data: Unit): ProcessedFunction? {
-        return null
-    }
-
-    override fun visitFunctionDeclaration(
-        function: KSFunctionDeclaration,
-        data: Unit,
-    ): ProcessedFunction {
-        return ProcessedFunction(
-            function.imports(),
-            function.declaration()
-        )
-    }
 }

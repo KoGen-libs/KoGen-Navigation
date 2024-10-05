@@ -19,9 +19,7 @@ internal class ScreenListContentGenerator {
         return buildString {
             appendLine("package ${kspPackage()}\n")
 
-            appendLine("import kz.evko.processor.routeActions.NavigationRouteScreens\n")
-
-            appendLine("enum class $className: NavigationRouteScreens {")
+            appendLine("enum class $className {")
 
             appendLine(
                 functionList.joinToString(
