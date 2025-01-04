@@ -21,5 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Navigation plugin"
 include(":app")
-include(":annotation")
-include(":processor")
+include(":navigation")

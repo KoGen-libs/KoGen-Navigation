@@ -3,10 +3,12 @@ package kz.evko.processor
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
 import com.google.devtools.ksp.processing.KSPLogger
+import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import kz.evko.processor.contentGenerators.NavHostContentGenerator
-import kz.evko.processor.contentGenerators.ScreenListContentGenerator
+import kz.evko.processor.contentGenerators.RoutesListGenerator
+import kz.evko.processor.contentGenerators.ScreenListGenerator
 import java.io.OutputStream
 import kotlin.reflect.KClass
 
@@ -14,38 +16,61 @@ internal class FileWriter(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) {
-    fun createScreensListFile(screensFunctions: List<KSFunctionDeclaration>, name: String) {
+    private var packageName = ""
+
+    fun createScreensList(screensFunctions: List<KSFunctionDeclaration>, name: String) {
         if (!screensFunctions.iterator().hasNext()) return
 
+        packageName = screensFunctions.first().packageName.asString()
+
         val fileName = "${name}NavigationScreens"
-        val screenListContentGenerator = ScreenListContentGenerator()
-        val content = screenListContentGenerator.generateContent(
+        val screenListContentGenerator = ScreenListGenerator(packageName)
+        val content = screenListContentGenerator.generateScreenList(
             screensFunctions.toList(),
             fileName,
+            logger,
         )
 
         val file: OutputStream =
-            createSCreensListFile(screensFunctions.toFileList(), fileName)
+            createFile(screensFunctions.toFileList(), fileName)
         file += content
         file.close()
+
+        createNavHost(screensFunctions, name)
     }
 
-    fun createNavHostFile(screenFunctions: List<KSFunctionDeclaration>, hostName: String) {
-        if (!screenFunctions.iterator().hasNext()) return
-
-        val navHostContentGenerator = NavHostContentGenerator()
-        val content = navHostContentGenerator.generateContent(
-            screenFunctions.toList(),
-            hostName,
+    private fun createNavHost(screensFunctions: List<KSFunctionDeclaration>, name: String) {
+        val navHostContentGenerator = NavHostContentGenerator(packageName)
+        val navHostContent = navHostContentGenerator.generateNavHost(
+            screensFunctions.toList(),
+            name,
         )
 
-        val file: OutputStream =
-            createSCreensListFile(screenFunctions.toFileList(), hostName)
-        file += content
-        file.close()
+        val navHostFile: OutputStream =
+            createFile(screensFunctions.toFileList(), name)
+        navHostFile += navHostContent
+        navHostFile.close()
     }
 
-    private fun createSCreensListFile(
+    fun createRoutes(screensFunctions: List<KSFunctionDeclaration>) {
+        val routesContentGenerator = RoutesListGenerator(packageName)
+
+        val routesContent = routesContentGenerator.generateRoutes(
+            screensFunctions.toList(),
+        )
+
+        val routesFile: OutputStream =
+            createFile(screensFunctions.toFileList(), "NavigationRoutes")
+        routesFile += routesContent
+        routesFile.close()
+
+        val extensionsFile: OutputStream =
+            createFile(emptyList(), "NavigationExtensions")
+        extensionsFile += routesContentGenerator.generateExtensions()
+        extensionsFile.close()
+    }
+
+    private fun createFile(
         files: List<KSFile>,
         fileName: String,
     ) = codeGenerator.createNewFile(
@@ -53,18 +78,16 @@ internal class FileWriter(
             false,
             *files.toList().toTypedArray(),
         ),
-        kspPackage(),
+        packageName,
         fileName
     )
 }
-
-internal fun kspPackage() = "kz.evko.navigationplugin"
 
 internal operator fun OutputStream.plusAssign(text: String) {
     write(text.toByteArray())
 }
 
-internal fun List<KSFunctionDeclaration>.toFileList(): List<KSFile> =
+internal fun List<KSDeclaration>.toFileList(): List<KSFile> =
     mapNotNull { it.containingFile }
 
 internal fun <T> KSFunctionDeclaration.annotationParameterByName(

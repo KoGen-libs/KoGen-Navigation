@@ -144,7 +144,7 @@ enum class ArgumentTypes(
     );
 
     companion object {
-        private fun findType(parameter: KSValueParameter): ArgumentTypes? = entries.firstOrNull {
+        fun findType(parameter: KSValueParameter): ArgumentTypes? = entries.firstOrNull {
             it.type == parameter.type.resolve().toString().replace("?", "")
         }
 
@@ -155,7 +155,7 @@ enum class ArgumentTypes(
             return type?.getArgumentString?.let {
                 "$it(\"$name\")${if (parameter.type.resolve().isMarkedNullable) "" else type.defaultArgumentString}"
             }
-                ?: "Gson().fromJson(it.arguments?.getString(\"$name\").orEmpty(), ${parameter.type}::class.java)"
+                ?: "Gson().fromJson(it.arguments?.getString(\"$name\").orEmpty(), ${parameter.type.resolve().declaration.packageName.asString()}.${parameter.type}::class.java)"
         }
 
         fun getNavArgsString(parameter: KSValueParameter): String {

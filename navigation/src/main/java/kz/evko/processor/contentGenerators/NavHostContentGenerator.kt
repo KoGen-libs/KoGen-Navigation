@@ -2,20 +2,17 @@ package kz.evko.processor.contentGenerators
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
-import kz.evko.processor.annotation.GenerateScreens
+import kz.evko.processor.annotation.KoGenScreen
 import kz.evko.processor.annotation.ViewModelInjector
 import kz.evko.processor.annotationParameterByName
-import kz.evko.processor.kspPackage
 import kz.evko.processor.replaceScreenWord
 
-class NavHostContentGenerator {
-    fun generateContent(functionList: List<KSFunctionDeclaration>, hostName: String): String {
-        return generateTexts(functionList, hostName)
-    }
-
-    private fun generateTexts(functionList: List<KSFunctionDeclaration>, hostName: String) =
-        buildString {
-            appendLine("package ${kspPackage()}\n")
+internal class NavHostContentGenerator(
+    private val packageName: String,
+) {
+    fun generateNavHost(functionList: List<KSFunctionDeclaration>, hostName: String): String {
+        return buildString {
+            appendLine("package $packageName\n")
 
             append(generateImports(functionList))
 
@@ -32,13 +29,13 @@ class NavHostContentGenerator {
                     append(
                         "${hostName}NavigationScreens.${
                             it.toString().replaceScreenWord()
-                        }.name) {\n"
+                        }.route) {\n"
                     )
                 } else {
                     appendLine(
                         "\n\t\t\t${hostName}NavigationScreens.${
                             it.toString().replaceScreenWord()
-                        }.name,"
+                        }.route,"
                     )
                     appendLine("\t\t\targuments = listOf(")
                     params.forEach { parameter ->
@@ -64,6 +61,7 @@ class NavHostContentGenerator {
             appendLine("\t}")
             appendLine("}")
         }
+    }
 
     private fun generateImports(functionList: List<KSFunctionDeclaration>): String {
         val injectors: MutableMap<ViewModelInjector, String> = mutableMapOf()
@@ -85,7 +83,7 @@ class NavHostContentGenerator {
             }
 
             injectors.forEach {
-                if (it.key != ViewModelInjector.NONE) {
+                if (it.key != ViewModelInjector.None) {
                     appendLine(it.value)
                 }
             }
@@ -100,7 +98,7 @@ class NavHostContentGenerator {
     ) = buildString {
         val startDestination = functionList.firstOrNull {
             it.annotationParameterByName<Boolean>(
-                GenerateScreens::class, "startDestination"
+                KoGenScreen::class, "startDestination"
             )
         } ?: functionList.first()
         val startDestinationName = startDestination.toString().replaceScreenWord()
@@ -109,7 +107,7 @@ class NavHostContentGenerator {
         appendLine("fun $hostName(")
         appendLine("\tmodifier: Modifier = Modifier,")
         appendLine("\tnavController: NavHostController,")
-        appendLine("\tstartDestination: String = ${hostName}NavigationScreens.$startDestinationName.name")
+        appendLine("\tstartDestination: String = ${hostName}NavigationScreens.$startDestinationName.route")
         appendLine(") {")
 
         appendLine("\tNavHost(")
@@ -128,7 +126,7 @@ class NavHostContentGenerator {
                 parameter.isViewModel() -> {
                     val viewModelInjector = function.getViewModelInjectorType()
 
-                    if (viewModelInjector != ViewModelInjector.NONE) {
+                    if (viewModelInjector != ViewModelInjector.None) {
                         appendLine(
                             "\t\t\t\t${parameter.name?.asString()}${
                                 viewModelInjector.getInjectorName(
@@ -155,12 +153,12 @@ class NavHostContentGenerator {
 fun KSFunctionDeclaration.getViewModelInjectorType(): ViewModelInjector {
     val viewModelInjectorName = "viewModelInjector"
     val injectorType = this.annotationParameterByName(
-        GenerateScreens::class,
+        KoGenScreen::class,
         viewModelInjectorName,
     )
     return ViewModelInjector.entries.firstOrNull {
         it.name == injectorType
-    } ?: ViewModelInjector.NONE
+    } ?: ViewModelInjector.None
 }
 
 fun KSValueParameter.isNavHostController(): Boolean {
