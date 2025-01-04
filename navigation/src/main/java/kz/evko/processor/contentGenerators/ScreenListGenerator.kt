@@ -16,9 +16,7 @@ internal class ScreenListGenerator(
         return buildString {
             appendLine("package $packageName\n")
 
-            appendLine("import kz.evko.processor.annotation.RouteScreenType\n")
-
-            appendLine("enum class $className(val route: String): RouteScreenType {")
+            appendLine("enum class $className(override val route: String): kz.evko.processor.routes.RouteScreenType {")
 
             appendLine(
                 functionList.joinToString(

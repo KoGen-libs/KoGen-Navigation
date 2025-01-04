@@ -1,6 +1,8 @@
 package kz.evko.processor.routes
 
-import kz.evko.processor.annotation.RouteScreenType
+interface RouteScreenType {
+    val route: String
+}
 
 open class NavigationAction(
     val route: String,

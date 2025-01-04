@@ -6,6 +6,7 @@ annotation class KoGenScreen(
     val startDestination: Boolean = false,
     val navHostName: String = "AppNavHost",
     val viewModelInjector: ViewModelInjector = ViewModelInjector.None,
+    val animation: NavigationAnimation = NavigationAnimation.Fade,
 )
 
 enum class ViewModelInjector(private val injectorName: String, private val injectorImport: String) {

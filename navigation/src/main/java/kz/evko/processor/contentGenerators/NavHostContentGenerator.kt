@@ -3,6 +3,7 @@ package kz.evko.processor.contentGenerators
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
 import kz.evko.processor.annotation.KoGenScreen
+import kz.evko.processor.annotation.NavigationAnimation
 import kz.evko.processor.annotation.ViewModelInjector
 import kz.evko.processor.annotationParameterByName
 import kz.evko.processor.replaceScreenWord
@@ -25,15 +26,18 @@ internal class NavHostContentGenerator(
                 val params = it.parameters.filter { parameter ->
                     !parameter.isNavHostController() && !parameter.isViewModel()
                 }
+                val animation = it.getAnimationType().type.buildAnimationContent()
                 if (params.isEmpty()) {
-                    append(
-                        "${hostName}NavigationScreens.${
+                    appendLine(
+                        "\n\t\t\troute = ${hostName}NavigationScreens.${
                             it.toString().replaceScreenWord()
-                        }.route) {\n"
+                        }.route,"
                     )
+                    append(animation)
+                    appendLine("\t\t) {")
                 } else {
                     appendLine(
-                        "\n\t\t\t${hostName}NavigationScreens.${
+                        "\n\t\t\troute = ${hostName}NavigationScreens.${
                             it.toString().replaceScreenWord()
                         }.route,"
                     )
@@ -41,8 +45,8 @@ internal class NavHostContentGenerator(
                     params.forEach { parameter ->
                         appendLine(ArgumentTypes.getNavArgsString(parameter))
                     }
-                    appendLine("\t\t\t)")
-
+                    appendLine("\t\t\t),")
+                    append(animation)
                     appendLine("\t\t) {")
                 }
 
@@ -159,6 +163,17 @@ fun KSFunctionDeclaration.getViewModelInjectorType(): ViewModelInjector {
     return ViewModelInjector.entries.firstOrNull {
         it.name == injectorType
     } ?: ViewModelInjector.None
+}
+
+fun KSFunctionDeclaration.getAnimationType(): NavigationAnimation {
+    val animationName = "animation"
+    val animationType = this.annotationParameterByName(
+        KoGenScreen::class,
+        animationName,
+    )
+    return NavigationAnimation.entries.firstOrNull {
+        it.name == animationType
+    } ?: NavigationAnimation.Fade
 }
 
 fun KSValueParameter.isNavHostController(): Boolean {
