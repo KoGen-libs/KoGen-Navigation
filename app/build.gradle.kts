@@ -28,7 +28,7 @@ android {
         }
     }
     buildFeatures {
-        compose=true
+        compose = true
     }
 
     compileOptions {
@@ -44,6 +44,10 @@ android {
     sourceSets.configureEach {
         kotlin.srcDir("$projectDir/build/generated/ksp/$name/kotlin")
     }
+}
+
+ksp {
+    arg("defaultAnimation", "slideLeft")
 }
 
 dependencies {

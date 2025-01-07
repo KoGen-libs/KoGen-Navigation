@@ -11,11 +11,16 @@ import kz.evko.processor.replaceScreenWord
 internal class NavHostContentGenerator(
     private val packageName: String,
 ) {
-    fun generateNavHost(functionList: List<KSFunctionDeclaration>, hostName: String): String {
+    fun generateNavHost(
+        functionList: List<KSFunctionDeclaration>,
+        hostName: String,
+        viewModelInjector: ViewModelInjector,
+        defaultAnimation: NavigationAnimation,
+    ): String {
         return buildString {
             appendLine("package $packageName\n")
 
-            append(generateImports(functionList))
+            append(generateImports(functionList, viewModelInjector))
 
             append(generateNavHostFunction(functionList, hostName))
 
@@ -26,7 +31,7 @@ internal class NavHostContentGenerator(
                 val params = it.parameters.filter { parameter ->
                     !parameter.isNavHostController() && !parameter.isViewModel()
                 }
-                val animation = it.getAnimationType().type.buildAnimationContent()
+                val animation = it.getAnimationType(defaultAnimation).type.buildAnimationContent()
                 if (params.isEmpty()) {
                     appendLine(
                         "\n\t\t\troute = ${hostName}NavigationScreens.${
@@ -55,7 +60,7 @@ internal class NavHostContentGenerator(
                 } else {
                     appendLine("\t\t\t${it.simpleName.asString()}(")
 
-                    append(generateScreenParameters(it))
+                    append(generateScreenParameters(it, viewModelInjector))
 
                     appendLine("\t\t\t)")
                 }
@@ -67,9 +72,10 @@ internal class NavHostContentGenerator(
         }
     }
 
-    private fun generateImports(functionList: List<KSFunctionDeclaration>): String {
-        val injectors: MutableMap<ViewModelInjector, String> = mutableMapOf()
-
+    private fun generateImports(
+        functionList: List<KSFunctionDeclaration>,
+        viewModelInjector: ViewModelInjector,
+    ): String {
         return buildString {
             appendLine("import androidx.compose.runtime.Composable")
             appendLine("import androidx.compose.ui.Modifier")
@@ -82,14 +88,10 @@ internal class NavHostContentGenerator(
 
             functionList.forEach {
                 appendLine("import ${it.packageName.asString()}.${it.simpleName.asString()}")
-                val type = it.getViewModelInjectorType()
-                injectors[type] = type.getInjectorImport()
             }
 
-            injectors.forEach {
-                if (it.key != ViewModelInjector.None) {
-                    appendLine(it.value)
-                }
+            if (viewModelInjector != ViewModelInjector.None) {
+                appendLine(viewModelInjector.getInjectorImport())
             }
 
             append("\n")
@@ -98,7 +100,7 @@ internal class NavHostContentGenerator(
 
     private fun generateNavHostFunction(
         functionList: List<KSFunctionDeclaration>,
-        hostName: String
+        hostName: String,
     ) = buildString {
         val startDestination = functionList.firstOrNull {
             it.annotationParameterByName<Boolean>(
@@ -121,15 +123,16 @@ internal class NavHostContentGenerator(
         appendLine("\t) {")
     }
 
-    private fun generateScreenParameters(function: KSFunctionDeclaration) = buildString {
+    private fun generateScreenParameters(
+        function: KSFunctionDeclaration,
+        viewModelInjector: ViewModelInjector,
+    ) = buildString {
         function.parameters.forEach { parameter ->
             when {
                 parameter.isNavHostController() ->
                     appendLine("\t\t\t\t${parameter.name?.asString()} = navController,")
 
                 parameter.isViewModel() -> {
-                    val viewModelInjector = function.getViewModelInjectorType()
-
                     if (viewModelInjector != ViewModelInjector.None) {
                         appendLine(
                             "\t\t\t\t${parameter.name?.asString()}${
@@ -154,26 +157,21 @@ internal class NavHostContentGenerator(
     }
 }
 
-fun KSFunctionDeclaration.getViewModelInjectorType(): ViewModelInjector {
-    val viewModelInjectorName = "viewModelInjector"
-    val injectorType = this.annotationParameterByName(
-        KoGenScreen::class,
-        viewModelInjectorName,
-    )
-    return ViewModelInjector.entries.firstOrNull {
-        it.name == injectorType
-    } ?: ViewModelInjector.None
-}
-
-fun KSFunctionDeclaration.getAnimationType(): NavigationAnimation {
+fun KSFunctionDeclaration.getAnimationType(defaultAnimation: NavigationAnimation): NavigationAnimation {
     val animationName = "animation"
     val animationType = this.annotationParameterByName(
         KoGenScreen::class,
         animationName,
     )
-    return NavigationAnimation.entries.firstOrNull {
+    val screenAnimationType = NavigationAnimation.entries.firstOrNull {
         it.name == animationType
-    } ?: NavigationAnimation.Fade
+    } ?: NavigationAnimation.None
+
+    return if (screenAnimationType == NavigationAnimation.None) {
+        defaultAnimation
+    } else {
+        screenAnimationType
+    }
 }
 
 fun KSValueParameter.isNavHostController(): Boolean {

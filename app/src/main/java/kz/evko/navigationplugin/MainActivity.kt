@@ -21,7 +21,6 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import kz.evko.processor.annotation.KoGenScreen
-import kz.evko.processor.annotation.NavigationAnimation
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,9 +33,7 @@ class MainActivity : ComponentActivity() {
 }
 
 
-@KoGenScreen(
-    animation = NavigationAnimation.SlideInRight,
-)
+@KoGenScreen
 @Composable
 fun MainScreen(
     navController: NavHostController
@@ -54,9 +51,7 @@ fun MainScreen(
     )
 }
 
-@KoGenScreen(
-    animation = NavigationAnimation.SlideInRight,
-)
+@KoGenScreen
 @Composable
 fun SecondScreen(
     navController: NavHostController,
@@ -80,9 +75,7 @@ fun SecondScreen(
     )
 }
 
-@KoGenScreen(
-    animation = NavigationAnimation.SlideInRight,
-)
+@KoGenScreen
 @Composable
 fun ThirdScreen(
     navController: NavHostController,
@@ -107,9 +100,7 @@ fun ThirdScreen(
     )
 }
 
-@KoGenScreen(
-    animation = NavigationAnimation.SlideInRight,
-)
+@KoGenScreen
 @Composable
 fun FourthScreen(
     navController: NavHostController,

@@ -6,6 +6,8 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import kz.evko.processor.annotation.NavigationAnimation
+import kz.evko.processor.annotation.ViewModelInjector
 import kz.evko.processor.contentGenerators.NavHostContentGenerator
 import kz.evko.processor.contentGenerators.RoutesListGenerator
 import kz.evko.processor.contentGenerators.ScreenListGenerator
@@ -18,7 +20,12 @@ internal class FileWriter(
 ) {
     private var packageName = ""
 
-    fun createScreensList(screensFunctions: List<KSFunctionDeclaration>, name: String) {
+    fun createScreensList(
+        screensFunctions: List<KSFunctionDeclaration>,
+        name: String,
+        viewModelInjector: ViewModelInjector,
+        defaultAnimation: NavigationAnimation,
+    ) {
         if (!screensFunctions.iterator().hasNext()) return
 
         packageName = screensFunctions.first().packageName.asString()
@@ -36,14 +43,25 @@ internal class FileWriter(
         file += content
         file.close()
 
-        createNavHost(screensFunctions, name)
+        createNavHost(
+            screensFunctions = screensFunctions,
+            name = name,
+            viewModelInjector = viewModelInjector,
+            defaultAnimation = defaultAnimation,
+        )
     }
 
-    private fun createNavHost(screensFunctions: List<KSFunctionDeclaration>, name: String) {
+    private fun createNavHost(
+        screensFunctions: List<KSFunctionDeclaration>, name: String,
+        viewModelInjector: ViewModelInjector,
+        defaultAnimation: NavigationAnimation,
+    ) {
         val navHostContentGenerator = NavHostContentGenerator(packageName)
         val navHostContent = navHostContentGenerator.generateNavHost(
-            screensFunctions.toList(),
-            name,
+            functionList = screensFunctions.toList(),
+            hostName = name,
+            viewModelInjector = viewModelInjector,
+            defaultAnimation = defaultAnimation,
         )
 
         val navHostFile: OutputStream =

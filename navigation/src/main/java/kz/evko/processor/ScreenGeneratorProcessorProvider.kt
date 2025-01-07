@@ -1,6 +1,5 @@
 package kz.evko.processor
 
-import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
@@ -9,22 +8,32 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.validate
 import kz.evko.processor.annotation.KoGenScreen
+import kz.evko.processor.annotation.NavigationAnimation
+import kz.evko.processor.annotation.ViewModelInjector
 import kotlin.reflect.KClass
 
 class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
         val fileWriter = FileWriter(environment.codeGenerator, environment.logger)
-        return ScreenGeneratorProcessor(fileWriter, environment.logger)
+        return ScreenGeneratorProcessor(fileWriter, environment.options)
     }
 }
 
 internal class ScreenGeneratorProcessor(
     private val fileGenerator: FileWriter,
-    private val logger: KSPLogger,
+    private val args: Map<String, String>,
 ) : SymbolProcessor {
     private val navHostName = "navHostName"
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
+        val viewModelInjector = ViewModelInjector.entries.firstOrNull {
+            it.diName == args["viewModelInjector"]
+        } ?: ViewModelInjector.None
+
+        val defaultAnimation = NavigationAnimation.entries.firstOrNull {
+            it.typeName == args["defaultAnimation"]
+        } ?: NavigationAnimation.None
+
         val screenFunctions: Sequence<KSFunctionDeclaration> =
             resolver.findAnnotations(KoGenScreen::class).filterIsInstance<KSFunctionDeclaration>()
 
@@ -36,7 +45,12 @@ internal class ScreenGeneratorProcessor(
                 navHostName
             )
         }.forEach {
-            fileGenerator.createScreensList(it.value, it.key)
+            fileGenerator.createScreensList(
+                screensFunctions = it.value,
+                name = it.key,
+                viewModelInjector = viewModelInjector,
+                defaultAnimation = defaultAnimation,
+            )
         }
         fileGenerator.createRoutes(screenFunctions.toList())
 

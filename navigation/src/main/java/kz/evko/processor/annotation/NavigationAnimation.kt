@@ -1,10 +1,13 @@
 package kz.evko.processor.annotation
 
 enum class NavigationAnimation(
+    val typeName: String,
     val type: AnimationType,
 ) {
-    Fade(AnimationType.Fade),
+    None("none", AnimationType.None),
+    Fade("fade", AnimationType.Fade),
     SlideLeft(
+        "slideLeft",
         AnimationType.Slide(
             enter = Offset(1f, 0f),
             exit = Offset(-1f, 0f),
@@ -12,7 +15,8 @@ enum class NavigationAnimation(
             popExit = Offset(1f, 0f),
         )
     ),
-    SlideInRight(
+    SlideRight(
+        "slideRight",
         AnimationType.Slide(
             enter = Offset(-1f, 0f),
             exit = Offset(1f, 0f),
@@ -21,6 +25,7 @@ enum class NavigationAnimation(
         )
     ),
     SlideUp(
+        "slideUp",
         AnimationType.Slide(
             enter = Offset(0f, 1f),
             exit = Offset(0f, -1f),
@@ -29,6 +34,7 @@ enum class NavigationAnimation(
         )
     ),
     SlideDown(
+        "slideDown",
         AnimationType.Slide(
             enter = Offset(0f, -1f),
             exit = Offset(0f, 1f),
@@ -39,6 +45,7 @@ enum class NavigationAnimation(
 }
 
 sealed class AnimationType {
+    data object None : AnimationType()
     data object Fade : AnimationType()
     class Slide(
         val enter: Offset,
@@ -48,7 +55,8 @@ sealed class AnimationType {
     ) : AnimationType()
 
     fun buildAnimationContent() = when (this) {
-        is Fade -> buildString {
+        None -> ""
+        Fade -> buildString {
             appendLine("\t\t\tenterTransition = { androidx.compose.animation.fadeIn() },")
             appendLine("\t\t\texitTransition = { androidx.compose.animation.fadeOut() },")
         }
