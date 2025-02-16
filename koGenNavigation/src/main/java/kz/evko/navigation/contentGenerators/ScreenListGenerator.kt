@@ -1,8 +1,8 @@
-package kz.evko.processor.contentGenerators
+package kz.evko.navigation.contentGenerators
 
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import kz.evko.processor.replaceScreenWord
+import kz.evko.navigation.replaceScreenWord
 
 internal class ScreenListGenerator(
     private val packageName: String,
@@ -16,7 +16,7 @@ internal class ScreenListGenerator(
         return buildString {
             appendLine("package $packageName\n")
 
-            appendLine("enum class $className(override val route: String): kz.evko.processor.routes.RouteScreenType {")
+            appendLine("enum class $className(override val route: String): kz.evko.navigation.routes.RouteScreenType {")
 
             appendLine(
                 functionList.joinToString(

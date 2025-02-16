@@ -20,7 +20,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
-import kz.evko.processor.annotation.KoGenScreen
+import kz.evko.navigation.annotation.KoGenScreen
+import kz.evko.navigationplugin.navigation.ActionToFourth
+import kz.evko.navigationplugin.navigation.ActionToSecond
+import kz.evko.navigationplugin.navigation.ActionToThird
+import kz.evko.navigationplugin.navigation.AppNavHost
+import kz.evko.navigationplugin.navigation.navigateSafety
+import kz.evko.navigationplugin.navigation.popBackSafety
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

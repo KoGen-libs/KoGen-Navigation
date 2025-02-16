@@ -1,8 +1,8 @@
-package kz.evko.processor.contentGenerators
+package kz.evko.navigation.contentGenerators
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
-import kz.evko.processor.replaceScreenWord
+import kz.evko.navigation.replaceScreenWord
 
 class RoutesListGenerator(
     private val packageName: String,
@@ -12,7 +12,7 @@ class RoutesListGenerator(
         return buildString {
             appendLine("package $packageName\n")
 
-            appendLine("import kz.evko.processor.routes.NavigationAction\n")
+            appendLine("import kz.evko.navigation.routes.NavigationAction\n")
 
             functionList.forEach {
                 val params = it.parameters.filter { param ->
@@ -62,18 +62,18 @@ class RoutesListGenerator(
         appendLine("import androidx.compose.ui.text.capitalize")
         appendLine("import androidx.compose.ui.text.intl.Locale")
         appendLine("import androidx.navigation.NavHostController")
-        appendLine("import kz.evko.processor.routes.navigationLog\n")
+        appendLine("import kz.evko.navigation.routes.navigationLog\n")
 
         appendLine("fun NavHostController.navigateSafety(")
-        appendLine("\taction: kz.evko.processor.routes.NavigationAction,")
-        appendLine("\tpopUpTo: kz.evko.processor.routes.RouteScreenType? = null,")
+        appendLine("\taction: kz.evko.navigation.routes.NavigationAction,")
+        appendLine("\tpopUpTo: kz.evko.navigation.routes.RouteScreenType? = null,")
         appendLine("\tinclusive: Boolean = false,")
         appendLine(") {")
         appendLine("\tLog.d(\"NavigateSafety\", action.navigationLog(popUpTo, inclusive))\n")
 
         appendLine("\tnavigate(action.route) {")
         appendLine("\t\tpopUpTo?.let {")
-        appendLine("\t\t\tpopUpTo(it) {")
+        appendLine("\t\t\tpopUpTo(it.route) {")
         appendLine("\t\t\t\tthis.inclusive = inclusive")
         appendLine("\t\t\t}")
         appendLine("\t\t}")
@@ -84,7 +84,7 @@ class RoutesListGenerator(
         appendLine("\tif (previousBackStackEntry != null) {")
         appendLine("\t\tLog.d(")
         appendLine("\t\t\t\"PopBackSafety\",")
-        appendLine("\t\t\tkz.evko.processor.routes.navigationBackLog(")
+        appendLine("\t\t\tkz.evko.navigation.routes.navigationBackLog(")
         appendLine("\t\t\t\tfromScreen = this@popBackSafety.currentDestination?.route?.split(\"?\")")
         appendLine("\t\t\t\t\t?.firstOrNull()?.capitalize(Locale.current),")
         appendLine("\t\t\t\ttoScreen = this@popBackSafety.previousBackStackEntry?.destination?.route?.split(\"?\")")

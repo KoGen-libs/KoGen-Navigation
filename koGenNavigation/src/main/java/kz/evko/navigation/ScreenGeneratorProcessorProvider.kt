@@ -1,4 +1,4 @@
-package kz.evko.processor
+package kz.evko.navigation
 
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessor
@@ -7,9 +7,9 @@ import com.google.devtools.ksp.processing.SymbolProcessorProvider
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.validate
-import kz.evko.processor.annotation.KoGenScreen
-import kz.evko.processor.annotation.NavigationAnimation
-import kz.evko.processor.annotation.ViewModelInjector
+import kz.evko.navigation.annotation.KoGenScreen
+import kz.evko.navigation.annotation.NavigationAnimation
+import kz.evko.navigation.annotation.ViewModelInjector
 import kotlin.reflect.KClass
 
 class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {
@@ -34,8 +34,13 @@ internal class ScreenGeneratorProcessor(
             it.typeName == args["defaultAnimation"]
         } ?: NavigationAnimation.None
 
+        val packageName = args["packageName"]
+
         val screenFunctions: Sequence<KSFunctionDeclaration> =
             resolver.findAnnotations(KoGenScreen::class).filterIsInstance<KSFunctionDeclaration>()
+
+        fileGenerator.createPackageName(packageName, screenFunctions)
+        fileGenerator.createExtensions()
 
         if (!screenFunctions.iterator().hasNext()) return emptyList()
 

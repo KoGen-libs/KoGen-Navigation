@@ -1,4 +1,4 @@
-package kz.evko.processor
+package kz.evko.navigation
 
 import com.google.devtools.ksp.processing.CodeGenerator
 import com.google.devtools.ksp.processing.Dependencies
@@ -6,11 +6,11 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import kz.evko.processor.annotation.NavigationAnimation
-import kz.evko.processor.annotation.ViewModelInjector
-import kz.evko.processor.contentGenerators.NavHostContentGenerator
-import kz.evko.processor.contentGenerators.RoutesListGenerator
-import kz.evko.processor.contentGenerators.ScreenListGenerator
+import kz.evko.navigation.annotation.NavigationAnimation
+import kz.evko.navigation.annotation.ViewModelInjector
+import kz.evko.navigation.contentGenerators.NavHostContentGenerator
+import kz.evko.navigation.contentGenerators.RoutesListGenerator
+import kz.evko.navigation.contentGenerators.ScreenListGenerator
 import java.io.OutputStream
 import kotlin.reflect.KClass
 
@@ -20,6 +20,15 @@ internal class FileWriter(
 ) {
     private var packageName = ""
 
+    fun createPackageName(paramsPackageName: String?, functions: Sequence<KSFunctionDeclaration>) {
+        packageName = paramsPackageName?.plus(".navigation").takeIf {
+            !it.isNullOrEmpty()
+        } ?: run {
+            val packageParts = functions.firstOrNull()?.packageName?.asString()?.split(".")
+            packageParts?.subList(0, 3)?.joinToString(".")?.plus(".navigation") ?: "kz.evko.navigation"
+        }
+    }
+
     fun createScreensList(
         screensFunctions: List<KSFunctionDeclaration>,
         name: String,
@@ -27,8 +36,6 @@ internal class FileWriter(
         defaultAnimation: NavigationAnimation,
     ) {
         if (!screensFunctions.iterator().hasNext()) return
-
-        packageName = screensFunctions.first().packageName.asString()
 
         val fileName = "${name}NavigationScreens"
         val screenListContentGenerator = ScreenListGenerator(packageName)
@@ -81,11 +88,18 @@ internal class FileWriter(
             createFile(screensFunctions.toFileList(), "NavigationRoutes")
         routesFile += routesContent
         routesFile.close()
+    }
 
-        val extensionsFile: OutputStream =
-            createFile(emptyList(), "NavigationExtensions")
-        extensionsFile += routesContentGenerator.generateExtensions()
-        extensionsFile.close()
+    fun createExtensions() {
+        try {
+            val routesContentGenerator = RoutesListGenerator(packageName)
+            val extensionsFile: OutputStream =
+                createFile(emptyList(), "NavigationExtensions")
+            extensionsFile += routesContentGenerator.generateExtensions()
+            extensionsFile.close()
+        } catch (e: Exception) {
+            logger.info(e.message.toString())
+        }
     }
 
     private fun createFile(

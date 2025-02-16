@@ -1,4 +1,4 @@
-package kz.evko.processor.contentGenerators
+package kz.evko.navigation.contentGenerators
 
 import com.google.devtools.ksp.symbol.KSValueParameter
 

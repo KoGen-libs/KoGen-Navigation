@@ -1,4 +1,4 @@
-package kz.evko.processor.routes
+package kz.evko.navigation.routes
 
 interface RouteScreenType {
     val route: String
@@ -13,7 +13,7 @@ fun NavigationAction.navigationLog(
     inclusive: Boolean = false,
 ): String = buildString {
     appendLine(" ---------------------------------------------------------------------------------")
-    appendLine("| Navigation action: ${this.javaClass.simpleName}")
+    appendLine("| Navigation action: ${this@navigationLog.javaClass.simpleName}")
     if (route.contains("?")) {
         appendLine("| ${route.split("?").lastOrNull()}")
     }

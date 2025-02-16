@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "kz.evko.navigationplugin"
+    namespace = "kz.evko.navigation"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "kz.evko.navigationplugin"
+        applicationId = "kz.evko.navigation"
         minSdk = 25
         targetSdk = 34
         versionCode = 1
@@ -65,6 +65,6 @@ dependencies {
     implementation(libs.androidx.navigation.compose)
     implementation(libs.koin)
     implementation(libs.gson)
-    implementation(project(":navigation"))
-    "ksp"(project(":navigation"))
+    implementation(project(":koGenNavigation"))
+    "ksp"(project(":koGenNavigation"))
 }

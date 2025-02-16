@@ -1,12 +1,12 @@
-package kz.evko.processor.contentGenerators
+package kz.evko.navigation.contentGenerators
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
-import kz.evko.processor.annotation.KoGenScreen
-import kz.evko.processor.annotation.NavigationAnimation
-import kz.evko.processor.annotation.ViewModelInjector
-import kz.evko.processor.annotationParameterByName
-import kz.evko.processor.replaceScreenWord
+import kz.evko.navigation.annotation.KoGenScreen
+import kz.evko.navigation.annotation.NavigationAnimation
+import kz.evko.navigation.annotation.ViewModelInjector
+import kz.evko.navigation.annotationParameterByName
+import kz.evko.navigation.replaceScreenWord
 
 internal class NavHostContentGenerator(
     private val packageName: String,

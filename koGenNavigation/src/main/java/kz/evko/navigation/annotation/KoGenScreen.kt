@@ -1,4 +1,4 @@
-package kz.evko.processor.annotation
+package kz.evko.navigation.annotation
 
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.SOURCE)
