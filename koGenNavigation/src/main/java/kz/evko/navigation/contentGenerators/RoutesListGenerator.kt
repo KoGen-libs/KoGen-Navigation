@@ -8,7 +8,7 @@ class RoutesListGenerator(
     private val packageName: String,
 ) {
     fun generateRoutes(functionList: List<KSFunctionDeclaration>): String {
-        var paramTypes: MutableMap<KSValueParameter, ArgumentTypes> = mutableMapOf()
+        val paramTypes: MutableMap<KSValueParameter, ArgumentTypes> = mutableMapOf()
         return buildString {
             appendLine("package $packageName\n")
 
@@ -80,7 +80,9 @@ class RoutesListGenerator(
         appendLine("\t}")
         appendLine("}")
 
-        appendLine("fun NavHostController.popBackSafety() {")
+        appendLine("\nfun NavHostController.popBackSafety(")
+        appendLine("\tbackStackData: kz.evko.navigation.helpers.BackStackData<*>? = null,")
+        appendLine(") {")
         appendLine("\tif (previousBackStackEntry != null) {")
         appendLine("\t\tLog.d(")
         appendLine("\t\t\t\"PopBackSafety\",")
@@ -91,8 +93,20 @@ class RoutesListGenerator(
         appendLine("\t\t\t\t\t?.firstOrNull()?.capitalize(Locale.current)")
         appendLine("\t\t\t)")
         appendLine("\t\t)\n")
+        appendLine("\t\tbackStackData?.let {")
+        appendLine("\t\t\tpreviousBackStackEntry?.savedStateHandle?.set(it.data.key, it.value)")
+        appendLine("\t\t}\n")
         appendLine("\t\tpopBackStack()")
         appendLine("\t}")
+        appendLine("}")
+
+        appendLine("\nfun <T> NavHostController.getResultData(")
+        appendLine("\tdata: kz.evko.navigation.helpers.NavigationResultKey<T>,")
+        appendLine("\tclearData: Boolean = true,")
+        appendLine("): T? {")
+        appendLine("\tval result = this.currentBackStackEntry?.savedStateHandle?.get(data.key) as T?")
+        appendLine("\tif (clearData) this.currentBackStackEntry?.savedStateHandle?.remove<T>(data.key)")
+        appendLine("\treturn result")
         appendLine("}")
     }
 }

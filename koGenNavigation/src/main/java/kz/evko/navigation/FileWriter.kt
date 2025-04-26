@@ -6,8 +6,8 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import kz.evko.navigation.annotation.NavigationAnimation
-import kz.evko.navigation.annotation.ViewModelInjector
+import kz.evko.navigation.helpers.NavigationAnimation
+import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.contentGenerators.NavHostContentGenerator
 import kz.evko.navigation.contentGenerators.RoutesListGenerator
 import kz.evko.navigation.contentGenerators.ScreenListGenerator

@@ -17,6 +17,7 @@ sourceSets.main {
     java.srcDirs("src/main/kotlin")
 }
 
-dependencies{
-    implementation(libs.symbol.processing.api.v18211011)
+dependencies {
+    implementation(libs.symbol.processing)
+    api(libs.gson)
 }

@@ -1,17 +1,18 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.kspAndroid) version libs.versions.symbolProcessingApi.get()
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kspAndroid)
 }
 
 android {
     namespace = "kz.evko.navigation"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "kz.evko.navigation"
         minSdk = 25
-        targetSdk = 34
+
         versionCode = 1
         versionName = "1.0"
 
@@ -61,10 +62,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.navigation.runtime.ktx)
-    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.navigation)
     implementation(libs.koin)
-    implementation(libs.gson)
+
     implementation(project(":koGenNavigation"))
     "ksp"(project(":koGenNavigation"))
 }

@@ -1,5 +1,7 @@
 package kz.evko.navigation.annotation
 
+import kz.evko.navigation.helpers.NavigationAnimation
+
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.SOURCE)
 annotation class KoGenScreen(

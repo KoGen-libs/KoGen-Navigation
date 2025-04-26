@@ -3,8 +3,8 @@ package kz.evko.navigation.contentGenerators
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
 import kz.evko.navigation.annotation.KoGenScreen
-import kz.evko.navigation.annotation.NavigationAnimation
-import kz.evko.navigation.annotation.ViewModelInjector
+import kz.evko.navigation.helpers.NavigationAnimation
+import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.annotationParameterByName
 import kz.evko.navigation.replaceScreenWord
 

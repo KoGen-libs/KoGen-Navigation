@@ -1,4 +1,4 @@
-package kz.evko.navigation.annotation
+package kz.evko.navigation.helpers
 
 enum class ViewModelInjector(
     val diName: String,

@@ -8,8 +8,8 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.validate
 import kz.evko.navigation.annotation.KoGenScreen
-import kz.evko.navigation.annotation.NavigationAnimation
-import kz.evko.navigation.annotation.ViewModelInjector
+import kz.evko.navigation.helpers.NavigationAnimation
+import kz.evko.navigation.helpers.ViewModelInjector
 import kotlin.reflect.KClass
 
 class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {

@@ -1,6 +1,7 @@
 package kz.evko.navigationplugin
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -14,17 +15,22 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import kz.evko.navigation.annotation.KoGenScreen
+import kz.evko.navigation.helpers.BackStackData
+import kz.evko.navigation.helpers.NavigationResultKey
 import kz.evko.navigationplugin.navigation.ActionToFourth
 import kz.evko.navigationplugin.navigation.ActionToSecond
 import kz.evko.navigationplugin.navigation.ActionToThird
 import kz.evko.navigationplugin.navigation.AppNavHost
+import kz.evko.navigationplugin.navigation.getResultData
 import kz.evko.navigationplugin.navigation.navigateSafety
 import kz.evko.navigationplugin.navigation.popBackSafety
 
@@ -44,6 +50,13 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     navController: NavHostController
 ) {
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        if (navController.getResultData(NavigationResultValues.ShowToast) == true) {
+            Toast.makeText(context, "It's a toast from nav result", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     Screen(
         color = Color.White,
         title = "Главная",
@@ -53,7 +66,8 @@ fun MainScreen(
                     title = "Второй",
                 )
             )
-        }
+        },
+        backClick = {}
     )
 }
 
@@ -76,6 +90,11 @@ fun SecondScreen(
                     screenNumber = 3,
                     screenColor = Color.Red,
                 )
+            )
+        },
+        backClick = {
+            navController.popBackSafety(
+                backStackData = BackStackData(NavigationResultValues.ShowToast, true)
             )
         }
     )
@@ -102,6 +121,9 @@ fun ThirdScreen(
                     titleColor = Color.White,
                 )
             )
+        },
+        backClick = {
+            navController.popBackSafety()
         }
     )
 }
@@ -123,6 +145,9 @@ fun FourthScreen(
         title = title,
         routeClick = {
             navController.popBackSafety()
+        },
+        backClick = {
+            navController.popBackSafety()
         }
     )
 }
@@ -133,6 +158,7 @@ fun Screen(
     titleColor: Color = Color.Black,
     title: String,
     routeClick: () -> Unit,
+    backClick: () -> Unit,
 ) {
     Scaffold(
         containerColor = color,
@@ -157,6 +183,19 @@ fun Screen(
             ) {
                 Text("Перейти")
             }
+            Button(
+                onClick = backClick,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+            ) {
+                Text("Go back")
+            }
         }
     }
+}
+
+sealed class NavigationResultValues<T>(override val key: String, override val defaultValue: T) :
+    NavigationResultKey<T> {
+    data object ShowToast : NavigationResultValues<Boolean>("showToast", false)
 }
