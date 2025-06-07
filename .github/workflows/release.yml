@@ -43,16 +43,7 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build and create artifacts
-        run: ./gradlew :KoGenNavigation:publish -Pversion=${{ steps.get_version.outputs.TAG_VERSION }}
-
-      - name: Check for staging directory
-        run: |
-          echo "Listing contents of the KoGenNavigation/build directory..."
-          ls -R KoGenNavigation/build
-          echo "---"
-          echo "Listing contents of the root build directory..."
-          ls -R build
-          continue-on-error: true
+        run: ./gradlew :koGenNavigation:publish -Pversion=${{ steps.get_version.outputs.TAG_VERSION }}
 
       - name: Release with JReleaser
         uses: jreleaser/release-action@v2
