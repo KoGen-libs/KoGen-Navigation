@@ -26,11 +26,15 @@ class RoutesListGenerator(
                 } else {
                     appendLine("class ActionTo$screenName(")
                     params.forEach { param ->
+                        val isNullable = param.type.resolve().isMarkedNullable
+                        val hasDefault = param.hasDefault
                         ArgumentTypes.findType(param)?.let { type ->
                             paramTypes[param] = type
-                            appendLine("\t${param.name?.asString()}: ${param.type},")
+                            append("\t${param.name?.asString()}: ${param.type}")
+                            if (isNullable) append("?${if (hasDefault) " = null" else ""},") else append(",")
                         } ?: run {
-                            appendLine("\t${param.name?.asString()}: ${param.type.resolve().declaration.packageName.asString()}.${param.type},")
+                            append("\t${param.name?.asString()}: ${param.type.resolve().declaration.packageName.asString()}.${param.type}")
+                            if (isNullable) append("?${if (hasDefault) " = null" else ""},") else append(",")
                         }
                     }
                     appendLine("): NavigationAction(")

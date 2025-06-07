@@ -26,13 +26,13 @@ import androidx.navigation.compose.rememberNavController
 import kz.evko.navigation.annotation.KoGenScreen
 import kz.evko.navigation.helpers.BackStackData
 import kz.evko.navigation.helpers.NavigationResultKey
-import kz.evko.navigationplugin.navigation.ActionToFourth
-import kz.evko.navigationplugin.navigation.ActionToSecond
-import kz.evko.navigationplugin.navigation.ActionToThird
-import kz.evko.navigationplugin.navigation.AppNavHost
-import kz.evko.navigationplugin.navigation.getResultData
-import kz.evko.navigationplugin.navigation.navigateSafety
-import kz.evko.navigationplugin.navigation.popBackSafety
+import kz.evko.navigation.navigation.ActionToFourth
+import kz.evko.navigation.navigation.ActionToSecond
+import kz.evko.navigation.navigation.ActionToThird
+import kz.evko.navigation.navigation.AppNavHost
+import kz.evko.navigation.navigation.getResultData
+import kz.evko.navigation.navigation.navigateSafety
+import kz.evko.navigation.navigation.popBackSafety
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -134,7 +134,7 @@ fun FourthScreen(
     navController: NavHostController,
     screenColor: Color,
     titleColor: Color,
-    title: String,
+    title: String? = null,
 ) {
     BackHandler {
         navController.popBackSafety()
@@ -142,7 +142,7 @@ fun FourthScreen(
     Screen(
         titleColor = titleColor,
         color = screenColor,
-        title = title,
+        title = title ?: "Nullable param",
         routeClick = {
             navController.popBackSafety()
         },
@@ -166,9 +166,9 @@ fun Screen(
             Text(
                 title,
                 modifier = Modifier
+                    .statusBarsPadding()
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .statusBarsPadding(),
+                    .height(56.dp),
                 textAlign = TextAlign.Center,
                 color = titleColor,
             )

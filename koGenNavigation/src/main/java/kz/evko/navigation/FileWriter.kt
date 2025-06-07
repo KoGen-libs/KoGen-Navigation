@@ -6,11 +6,11 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
-import kz.evko.navigation.helpers.NavigationAnimation
-import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.contentGenerators.NavHostContentGenerator
 import kz.evko.navigation.contentGenerators.RoutesListGenerator
 import kz.evko.navigation.contentGenerators.ScreenListGenerator
+import kz.evko.navigation.helpers.NavigationAnimation
+import kz.evko.navigation.helpers.ViewModelInjector
 import java.io.OutputStream
 import kotlin.reflect.KClass
 
@@ -25,7 +25,8 @@ internal class FileWriter(
             !it.isNullOrEmpty()
         } ?: run {
             val packageParts = functions.firstOrNull()?.packageName?.asString()?.split(".")
-            packageParts?.subList(0, 3)?.joinToString(".")?.plus(".navigation") ?: "kz.evko.navigation"
+            packageParts?.subList(0, 3)?.joinToString(".")?.plus(".navigation")
+                ?: "kz.evko.navigation"
         }
     }
 
@@ -37,25 +38,29 @@ internal class FileWriter(
     ) {
         if (!screensFunctions.iterator().hasNext()) return
 
-        val fileName = "${name}NavigationScreens"
-        val screenListContentGenerator = ScreenListGenerator(packageName)
-        val content = screenListContentGenerator.generateScreenList(
-            screensFunctions.toList(),
-            fileName,
-            logger,
-        )
+        try {
+            val fileName = "${name}NavigationScreens"
+            val screenListContentGenerator = ScreenListGenerator(packageName)
+            val content = screenListContentGenerator.generateScreenList(
+                screensFunctions.toList(),
+                fileName,
+                logger,
+            )
 
-        val file: OutputStream =
-            createFile(screensFunctions.toFileList(), fileName)
-        file += content
-        file.close()
+            val file: OutputStream =
+                createFile(screensFunctions.toFileList(), fileName)
+            file += content
+            file.close()
 
-        createNavHost(
-            screensFunctions = screensFunctions,
-            name = name,
-            viewModelInjector = viewModelInjector,
-            defaultAnimation = defaultAnimation,
-        )
+            createNavHost(
+                screensFunctions = screensFunctions,
+                name = name,
+                viewModelInjector = viewModelInjector,
+                defaultAnimation = defaultAnimation,
+            )
+        } catch (e: Exception) {
+            logger.info("Exception: ${e.message}")
+        }
     }
 
     private fun createNavHost(
@@ -78,16 +83,20 @@ internal class FileWriter(
     }
 
     fun createRoutes(screensFunctions: List<KSFunctionDeclaration>) {
-        val routesContentGenerator = RoutesListGenerator(packageName)
+        try {
+            val routesContentGenerator = RoutesListGenerator(packageName)
 
-        val routesContent = routesContentGenerator.generateRoutes(
-            screensFunctions.toList(),
-        )
+            val routesContent = routesContentGenerator.generateRoutes(
+                screensFunctions.toList(),
+            )
 
-        val routesFile: OutputStream =
-            createFile(screensFunctions.toFileList(), "NavigationRoutes")
-        routesFile += routesContent
-        routesFile.close()
+            val routesFile: OutputStream =
+                createFile(screensFunctions.toFileList(), "NavigationRoutes")
+            routesFile += routesContent
+            routesFile.close()
+        } catch (e: Exception) {
+            logger.info("Exception: ${e.message}")
+        }
     }
 
     fun createExtensions() {
@@ -98,7 +107,7 @@ internal class FileWriter(
             extensionsFile += routesContentGenerator.generateExtensions()
             extensionsFile.close()
         } catch (e: Exception) {
-            logger.info(e.message.toString())
+            logger.info("Exception: ${e.message}")
         }
     }
 
@@ -107,7 +116,7 @@ internal class FileWriter(
         fileName: String,
     ) = codeGenerator.createNewFile(
         Dependencies(
-            false,
+            true,
             *files.toList().toTypedArray(),
         ),
         packageName,

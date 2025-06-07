@@ -49,6 +49,7 @@ android {
 
 ksp {
     arg("defaultAnimation", "slideLeft")
+    arg("packageName", "kz.evko.navigation")
 }
 
 dependencies {
