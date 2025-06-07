@@ -1,6 +1,6 @@
 project:
   name: KoGenNavigation
-  description: A dependency injection library for Kotlin
+  description: A compose navigation library for Kotlin
   authors:
     - Eugen Kopp
   license: Apache-2.0
