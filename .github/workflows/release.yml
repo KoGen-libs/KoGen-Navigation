@@ -34,6 +34,7 @@ jobs:
         run: echo "TAG_VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
 
       - name: Import GPG key
+        id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.JRELEASER_GPG_SECRET_KEY }}
@@ -43,6 +44,9 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Build and create artifacts
+        env:
+          ORG_GRADLE_PROJECT_signing_keyId: ${{ steps.import_gpg.outputs.key_id }}
+          ORG_GRADLE_PROJECT_signing_password: ${{ secrets.JRELEASER_GPG_PASSPHRASE }}
         run: ./gradlew :KoGenNavigation:publish -Pversion=${{ steps.get_version.outputs.TAG_VERSION }}
 
       - name: Release with JReleaser
