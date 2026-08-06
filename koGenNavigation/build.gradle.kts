@@ -26,11 +26,19 @@ sourceSets.main {
 dependencies {
     api(libs.gson)
 
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+
     constraints {
         implementation("org.apache.commons:commons-compress:1.26.2") {
             because("JReleaser requires this version to avoid a conflict")
         }
     }
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 publishing {

@@ -23,10 +23,30 @@ dependencies {
     implementation(libs.symbol.processing)
     implementation(project(":koGenNavigation"))
 
+    testImplementation(platform(libs.junit.bom))
+    testImplementation(libs.junit.jupiter)
+    testRuntimeOnly(libs.junit.platform.launcher)
+    testImplementation(libs.gson)
+    testImplementation(libs.kotlin.compile.testing)
+    testImplementation(libs.kotlin.compile.testing.ksp)
+
     constraints {
         implementation("org.apache.commons:commons-compress:1.26.2") {
             because("JReleaser requires this version to avoid a conflict")
         }
+    }
+}
+
+tasks.test {
+    useJUnitPlatform()
+    // kotlin-compile-testing spins up an in-process javac/kotlinc; give it room to run.
+    maxHeapSize = "2g"
+}
+
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
+    compilerOptions {
+        // kotlin-compile-testing's whole API is marked @ExperimentalCompilerApi.
+        freeCompilerArgs.add("-opt-in=org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
     }
 }
 
