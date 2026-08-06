@@ -1,6 +1,22 @@
 package kz.evko.navigation.contentGenerators
 
+import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSValueParameter
+
+/**
+ * Fully-qualified Kotlin type name for this type, including generic type arguments (e.g. a
+ * custom class used as `List<Custom>`). Used for types [ArgumentTypes.findType] doesn't
+ * recognize - the ones handled via Gson - because the generated file never imports anything
+ * beyond the screen function itself, so every part of the type must be spelled out or it won't
+ * resolve (this was a real bug: `List<Custom>` used to print as `kotlin.collections.List<Custom>`,
+ * leaving the inner `Custom` unqualified and unresolved).
+ */
+internal fun KSType.fullyQualifiedName(): String {
+    val qualifiedName = declaration.qualifiedName?.asString() ?: declaration.simpleName.asString()
+    if (arguments.isEmpty()) return qualifiedName
+    val typeArgs = arguments.mapNotNull { it.type?.resolve()?.fullyQualifiedName() }
+    return "$qualifiedName<${typeArgs.joinToString(", ")}>"
+}
 
 enum class ArgumentTypes(
     private val type: String,
@@ -40,7 +56,9 @@ enum class ArgumentTypes(
     FloatType(
         "Float",
         "it.arguments?.getFloat",
-        " ?: 0",
+        // Must be a Float literal: unlike Long, Kotlin doesn't auto-widen a bare Int literal
+        // to Float, so "?: 0" here was a hard compile error for any non-null Float parameter.
+        " ?: 0f",
         "NavType.FloatType",
         "0f",
     ),
@@ -70,14 +88,17 @@ enum class ArgumentTypes(
         "it.arguments?.getStringArray",
         " ?: arrayOf()",
         "NavType.StringArrayType",
-        "arrayOf()",
+        // Explicit type argument: NavArgumentBuilder.defaultValue is typed `Any?`, which gives
+        // Kotlin no context to infer a bare `arrayOf()`'s element type (unlike e.g. intArrayOf(),
+        // which returns a concrete, non-generic IntArray).
+        "arrayOf<String>()",
     ),
     ListStringType(
         "List<String>",
         "it.arguments?.getStringArray",
         "?.toList() ?: listOf()",
         "NavType.StringArrayType",
-        "arrayOf()",
+        "arrayOf<String>()",
     ),
     IntArrayType(
         "IntArray",
@@ -151,11 +172,27 @@ enum class ArgumentTypes(
         fun getArgumentString(parameter: KSValueParameter): String {
             val name = parameter.name?.asString()
             val type = findType(parameter)
+            val resolved = parameter.type.resolve()
 
             return type?.getArgumentString?.let {
-                "$it(\"$name\")${if (parameter.type.resolve().isMarkedNullable) "" else type.defaultArgumentString}"
+                "$it(\"$name\")${if (resolved.isMarkedNullable) "" else type.defaultArgumentString}"
+            } ?: run {
+                val typeName = resolved.fullyQualifiedName()
+                // TypeToken, not `Class<T>`/`::class.java`: a plain Class reference can't express
+                // a parameterized type like `List<Custom>` (and would previously generate invalid
+                // Kotlin for it - "List<Custom>::class.java" isn't valid syntax), and even for a
+                // simple non-generic type, Gson's Class-based overload is only reliable when
+                // there's no generic type argument to lose to erasure.
+                val deserialize =
+                    "Gson().fromJson<$typeName>(json, object : com.google.gson.reflect.TypeToken<$typeName>() {}.type)"
+                if (resolved.isMarkedNullable) {
+                    // Null-safe: a missing/absent argument yields null instead of trying (and
+                    // failing) to parse an empty string as JSON.
+                    "it.arguments?.getString(\"$name\")?.let { json -> $deserialize }"
+                } else {
+                    "it.arguments?.getString(\"$name\").orEmpty().let { json -> $deserialize }"
+                }
             }
-                ?: "Gson().fromJson(it.arguments?.getString(\"$name\").orEmpty(), ${parameter.type.resolve().declaration.packageName.asString()}.${parameter.type}::class.java)"
         }
 
         fun getNavArgsString(parameter: KSValueParameter): String {

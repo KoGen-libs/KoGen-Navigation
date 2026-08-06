@@ -12,6 +12,8 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/app" />
             <option value="$PROJECT_DIR$/koGenNavigation" />
+            <option value="$PROJECT_DIR$/koGenNavigationCommon" />
+            <option value="$PROJECT_DIR$/koGenNavigationCompiler" />
           </set>
         </option>
       </GradleProjectSettings>

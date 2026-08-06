@@ -6,6 +6,7 @@ import kz.evko.navigation.replaceScreenWord
 
 internal class ScreenListGenerator(
     private val packageName: String,
+    private val screenSuffix: String?,
 ) {
     fun generateScreenList(
         functionList: List<KSFunctionDeclaration>,
@@ -27,10 +28,10 @@ internal class ScreenListGenerator(
                     val params = it.parameters.filter { parameter ->
                         !parameter.isViewModel() && !parameter.isNavHostController()
                     }
-                    val screenName = it.toString().replaceScreenWord()
+                    val screenName = it.toString().replaceScreenWord(screenSuffix)
                     if (params.isEmpty()) "$screenName(\"${screenName.lowercase()}\")"
                     else {
-                        it.toString().replaceScreenWord() + "(\"" +
+                        screenName + "(\"" +
                                 screenName.lowercase() +
                                 params.joinToString(
                                     separator = "&",

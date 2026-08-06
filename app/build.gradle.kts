@@ -50,6 +50,7 @@ android {
 ksp {
     arg("defaultAnimation", "slideLeft")
     arg("packageName", "kz.evko.navigation")
+    arg("screenSuffix", "Screen")
 }
 
 dependencies {
@@ -67,5 +68,5 @@ dependencies {
     implementation(libs.koin)
 
     implementation(project(":koGenNavigation"))
-    "ksp"(project(":koGenNavigation"))
+    "ksp"(project(":koGenNavigationCompiler"))
 }

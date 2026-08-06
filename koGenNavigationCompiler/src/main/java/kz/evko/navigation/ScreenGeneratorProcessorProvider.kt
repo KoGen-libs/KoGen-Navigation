@@ -25,6 +25,16 @@ internal class ScreenGeneratorProcessor(
 ) : SymbolProcessor {
     private val navHostName = "navHostName"
 
+    // KSP invokes process() once per round (there are several per compilation, even when nothing
+    // changed) on this same processor instance. createPackageName()/createExtensions() only need
+    // to run once - the first round always sees every currently-known @KoGenScreen function, so
+    // there's nothing to gain by repeating it on later rounds. Without this guard, later rounds
+    // see zero annotated symbols (they were already consumed), the package-name inference has
+    // nothing to infer from and silently falls back to a hardcoded default, and
+    // createExtensions() regenerates NavigationExtensions.kt a second time under that wrong
+    // package - a stray duplicate file alongside the correct one.
+    private var hasGeneratedExtensions = false
+
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val viewModelInjector = ViewModelInjector.entries.firstOrNull {
             it.diName == args["viewModelInjector"]
@@ -35,17 +45,21 @@ internal class ScreenGeneratorProcessor(
         } ?: NavigationAnimation.None
 
         val packageName = args["packageName"]
+        val screenSuffix = args["screenSuffix"]
 
         val screenFunctions: Sequence<KSFunctionDeclaration> =
             resolver.findAnnotations(KoGenScreen::class).filterIsInstance<KSFunctionDeclaration>()
 
-        fileGenerator.createPackageName(packageName, screenFunctions)
-        fileGenerator.createExtensions()
+        if (!hasGeneratedExtensions) {
+            hasGeneratedExtensions = true
+            fileGenerator.createPackageName(packageName, screenFunctions)
+            fileGenerator.createExtensions()
+        }
 
         if (!screenFunctions.iterator().hasNext()) return emptyList()
 
         screenFunctions.groupBy {
-            it.annotationParameterByName<String>(
+            it.stringAnnotationParameterByName(
                 KoGenScreen::class,
                 navHostName
             )
@@ -55,9 +69,10 @@ internal class ScreenGeneratorProcessor(
                 name = it.key,
                 viewModelInjector = viewModelInjector,
                 defaultAnimation = defaultAnimation,
+                screenSuffix = screenSuffix,
             )
         }
-        fileGenerator.createRoutes(screenFunctions.toList())
+        fileGenerator.createRoutes(screenFunctions.toList(), screenSuffix)
 
         return (screenFunctions).filterNot { it.validate() }.toList()
     }

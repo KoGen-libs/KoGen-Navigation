@@ -21,4 +21,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Navigation plugin"
 include(":app")
+include(":koGenNavigationCommon")
 include(":koGenNavigation")
+include(":koGenNavigationCompiler")
