@@ -2,11 +2,18 @@ plugins {
     id("java-library")
     alias(libs.plugins.jetbrains.kotlin.jvm)
     alias(libs.plugins.kspAndroid)
+    alias(libs.plugins.jreleaser)
+    id("maven-publish")
+    id("signing")
 }
+
+group = project.properties["GROUP"].toString()
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
+    withSourcesJar()
+    withJavadocJar()
 }
 
 kotlin {
@@ -20,4 +27,61 @@ sourceSets.main {
 dependencies {
     implementation(libs.symbol.processing)
     api(libs.gson)
+
+    constraints {
+        implementation("org.apache.commons:commons-compress:1.26.2") {
+            because("JReleaser requires this version to avoid a conflict")
+        }
+    }
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("release") {
+            from(components["java"])
+
+            groupId = properties["GROUP"].toString()
+            artifactId = "navigation-compose"
+
+            pom {
+                name.set("KoGen Navigation")
+                description.set("A library for navigation in compose")
+                url.set("https://github.com/EugenProg/KoGen-navigation_demo")
+
+                licenses {
+                    license {
+                        name.set("The Apache License, Version 2.0")
+                        url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                    }
+                }
+
+                developers {
+                    developer {
+                        id.set("EugenProg")
+                        name.set("Eugen Kopp")
+                        email.set("Eugen.kopp.kz@gmail.com")
+                    }
+                }
+
+                scm {
+                    connection.set("scm:git:git://github.com/EugenProg/KoGen-Navigation.git")
+                    developerConnection.set("scm:git:ssh://github.com:EugenProg/KoGen-Navigation.git")
+                    url.set("https://github.com/EugenProg/KoGen-Navigation/tree/master")
+                }
+            }
+        }
+    }
+    repositories {
+        maven {
+            setUrl(layout.buildDirectory.dir("staging-deploy"))
+        }
+    }
+}
+
+signing {
+    val signingKey = System.getenv("JRELEASER_GPG_SECRET_KEY")
+    val signingPassword = System.getenv("JRELEASER_GPG_PASSPHRASE")
+    useInMemoryPgpKeys(signingKey, signingPassword)
+
+    sign(publishing.publications["release"])
 }
