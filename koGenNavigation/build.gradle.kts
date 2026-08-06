@@ -1,6 +1,6 @@
 plugins {
-    id("java-library")
-    alias(libs.plugins.jetbrains.kotlin.jvm)
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.jreleaser)
     id("maven-publish")
     id("signing")
@@ -8,22 +8,37 @@ plugins {
 
 group = project.properties["GROUP"].toString()
 
-java {
-    sourceCompatibility = JavaVersion.VERSION_17
-    targetCompatibility = JavaVersion.VERSION_17
-    withSourcesJar()
-    withJavadocJar()
-}
+android {
+    namespace = "kz.evko.navigation.runtime"
+    compileSdk = 35
 
-kotlin {
-    jvmToolchain(17)
-}
+    defaultConfig {
+        minSdk = 25
+    }
 
-sourceSets.main {
-    java.srcDirs("src/main/kotlin")
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    sourceSets.getByName("main") {
+        java.srcDirs("src/main/kotlin")
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+            withJavadocJar()
+        }
+    }
 }
 
 dependencies {
+    api(project(":koGenNavigationCommon"))
     api(libs.gson)
 
     testImplementation(platform(libs.junit.bom))
@@ -37,57 +52,61 @@ dependencies {
     }
 }
 
-tasks.test {
+tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-publishing {
-    publications {
-        create<MavenPublication>("release") {
-            from(components["java"])
+// AGP only registers the "release" software component (needed for `from(components["release"])`
+// below) once the library variants have been created, which happens after this script evaluates.
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components["release"])
 
-            groupId = properties["GROUP"].toString()
-            artifactId = "navigation-compose"
+                groupId = properties["GROUP"].toString()
+                artifactId = "navigation-compose"
 
-            pom {
-                name.set("KoGen Navigation")
-                description.set("A library for navigation in compose")
-                url.set("https://github.com/EugenProg/KoGen-navigation_demo")
+                pom {
+                    name.set("KoGen Navigation")
+                    description.set("A library for navigation in compose")
+                    url.set("https://github.com/EugenProg/KoGen-navigation_demo")
 
-                licenses {
-                    license {
-                        name.set("The Apache License, Version 2.0")
-                        url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                    licenses {
+                        license {
+                            name.set("The Apache License, Version 2.0")
+                            url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                        }
                     }
-                }
 
-                developers {
-                    developer {
-                        id.set("EugenProg")
-                        name.set("Eugen Kopp")
-                        email.set("Eugen.kopp.kz@gmail.com")
+                    developers {
+                        developer {
+                            id.set("EugenProg")
+                            name.set("Eugen Kopp")
+                            email.set("Eugen.kopp.kz@gmail.com")
+                        }
                     }
-                }
 
-                scm {
-                    connection.set("scm:git:git://github.com/EugenProg/KoGen-Navigation.git")
-                    developerConnection.set("scm:git:ssh://github.com:EugenProg/KoGen-Navigation.git")
-                    url.set("https://github.com/EugenProg/KoGen-Navigation/tree/master")
+                    scm {
+                        connection.set("scm:git:git://github.com/EugenProg/KoGen-Navigation.git")
+                        developerConnection.set("scm:git:ssh://github.com:EugenProg/KoGen-Navigation.git")
+                        url.set("https://github.com/EugenProg/KoGen-Navigation/tree/master")
+                    }
                 }
             }
         }
-    }
-    repositories {
-        maven {
-            setUrl(layout.buildDirectory.dir("staging-deploy"))
+        repositories {
+            maven {
+                setUrl(layout.buildDirectory.dir("staging-deploy"))
+            }
         }
     }
-}
 
-signing {
-    val signingKey = System.getenv("JRELEASER_GPG_SECRET_KEY")
-    val signingPassword = System.getenv("JRELEASER_GPG_PASSPHRASE")
-    useInMemoryPgpKeys(signingKey, signingPassword)
+    signing {
+        val signingKey = System.getenv("JRELEASER_GPG_SECRET_KEY")
+        val signingPassword = System.getenv("JRELEASER_GPG_PASSPHRASE")
+        useInMemoryPgpKeys(signingKey, signingPassword)
 
-    sign(publishing.publications["release"])
+        sign(publishing.publications["release"])
+    }
 }

@@ -20,15 +20,9 @@ kotlin {
 }
 
 dependencies {
-    implementation(libs.symbol.processing)
-    implementation(project(":koGenNavigationCommon"))
-
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
-    testImplementation(libs.gson)
-    testImplementation(libs.kotlin.compile.testing)
-    testImplementation(libs.kotlin.compile.testing.ksp)
 
     constraints {
         implementation("org.apache.commons:commons-compress:1.26.2") {
@@ -39,15 +33,6 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-    // kotlin-compile-testing spins up an in-process javac/kotlinc; give it room to run.
-    maxHeapSize = "2g"
-}
-
-tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileTestKotlin") {
-    compilerOptions {
-        // kotlin-compile-testing's whole API is marked @ExperimentalCompilerApi.
-        freeCompilerArgs.add("-opt-in=org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi")
-    }
 }
 
 publishing {
@@ -56,11 +41,11 @@ publishing {
             from(components["java"])
 
             groupId = properties["GROUP"].toString()
-            artifactId = "navigation-compose-compiler"
+            artifactId = "navigation-compose-common"
 
             pom {
-                name.set("KoGen Navigation Compiler")
-                description.set("KSP symbol processor that generates the compose navigation code for KoGen Navigation")
+                name.set("KoGen Navigation Common")
+                description.set("Shared annotation and types used by both the KoGen Navigation runtime and its KSP compiler")
                 url.set("https://github.com/EugenProg/KoGen-navigation_demo")
 
                 licenses {

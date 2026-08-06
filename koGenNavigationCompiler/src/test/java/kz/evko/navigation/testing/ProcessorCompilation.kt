@@ -50,7 +50,7 @@ fun compileScreenSources(
     verifyCompiles: Boolean = true,
 ): ProcessorTestResult {
     val compilation = KotlinCompilation().apply {
-        sources = testSources.toList() + androidStubSources
+        sources = testSources.toList() + androidStubSources + runtimeStubSources
         inheritClassPath = true
         messageOutputStream = System.out
 
