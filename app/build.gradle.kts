@@ -50,6 +50,7 @@ android {
 ksp {
     arg("defaultAnimation", "slideLeft")
     arg("packageName", "kz.evko.navigation")
+    arg("screenSuffix", "Screen")
 }
 
 dependencies {

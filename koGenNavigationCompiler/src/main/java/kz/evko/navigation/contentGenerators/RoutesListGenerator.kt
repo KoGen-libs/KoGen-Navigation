@@ -6,6 +6,7 @@ import kz.evko.navigation.replaceScreenWord
 
 class RoutesListGenerator(
     private val packageName: String,
+    private val screenSuffix: String? = null,
 ) {
     fun generateRoutes(functionList: List<KSFunctionDeclaration>): String {
         val paramTypes: MutableMap<KSValueParameter, ArgumentTypes> = mutableMapOf()
@@ -18,7 +19,7 @@ class RoutesListGenerator(
                 val params = it.parameters.filter { param ->
                     !param.isNavHostController() && !param.isViewModel()
                 }
-                val screenName = it.toString().replaceScreenWord()
+                val screenName = it.toString().replaceScreenWord(screenSuffix)
                 if (params.isEmpty()) {
                     appendLine("data object ActionTo$screenName : NavigationAction(")
                     appendLine("\troute = \"${screenName.lowercase()}\",")
@@ -28,12 +29,22 @@ class RoutesListGenerator(
                     params.forEach { param ->
                         val isNullable = param.type.resolve().isMarkedNullable
                         val hasDefault = param.hasDefault
+                        // `param.type.toString()` is the raw, as-written type reference and can
+                        // print variance markers for generic type arguments (e.g. "List<INVARIANT
+                        // String>", which isn't valid Kotlin). `param.type.resolve().toString()`
+                        // is the resolved type without those markers - strip its trailing "?" so
+                        // we don't double it up with the nullable suffix appended below.
+                        val typeName = param.type.resolve().toString().removeSuffix("?")
                         ArgumentTypes.findType(param)?.let { type ->
                             paramTypes[param] = type
-                            append("\t${param.name?.asString()}: ${param.type}")
+                            append("\t${param.name?.asString()}: $typeName")
                             if (isNullable) append("?${if (hasDefault) " = null" else ""},") else append(",")
                         } ?: run {
-                            append("\t${param.name?.asString()}: ${param.type.resolve().declaration.packageName.asString()}.${param.type}")
+                            // Fully qualify every part of the type, including generic type
+                            // arguments (e.g. "kotlin.collections.List<test.app.UserProfile>") -
+                            // this file only ever imports the screen function, so an unqualified
+                            // custom type (or type argument) here is an unresolved reference.
+                            append("\t${param.name?.asString()}: ${param.type.resolve().fullyQualifiedName()}")
                             if (isNullable) append("?${if (hasDefault) " = null" else ""},") else append(",")
                         }
                     }

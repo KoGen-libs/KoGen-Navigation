@@ -23,6 +23,14 @@ internal val androidStubSources: List<SourceFile> = listOf(
         """.trimIndent(),
     ),
     SourceFile.kotlin(
+        "LifecycleViewModelStub.kt",
+        """
+        package androidx.lifecycle
+
+        abstract class ViewModel
+        """.trimIndent(),
+    ),
+    SourceFile.kotlin(
         "ComposeRuntimeStub.kt",
         """
         package androidx.compose.runtime
@@ -213,6 +221,14 @@ internal val androidStubSources: List<SourceFile> = listOf(
         package org.koin.androidx.compose
 
         inline fun <reified T> koinViewModel(): T = TODO("stub")
+        """.trimIndent(),
+    ),
+    SourceFile.kotlin(
+        "LifecycleViewModelComposeStub.kt",
+        """
+        package androidx.lifecycle.viewmodel.compose
+
+        inline fun <reified T> viewModel(): T = TODO("stub")
         """.trimIndent(),
     ),
 )

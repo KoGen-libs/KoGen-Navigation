@@ -1,15 +1,19 @@
 package kz.evko.navigation.contentGenerators
 
+import com.google.devtools.ksp.getAllSuperTypes
+import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
 import kz.evko.navigation.annotation.KoGenScreen
 import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.annotationParameterByName
+import kz.evko.navigation.booleanAnnotationParameterByName
 import kz.evko.navigation.replaceScreenWord
 
 internal class NavHostContentGenerator(
     private val packageName: String,
+    private val screenSuffix: String?,
 ) {
     fun generateNavHost(
         functionList: List<KSFunctionDeclaration>,
@@ -35,7 +39,7 @@ internal class NavHostContentGenerator(
                 if (params.isEmpty()) {
                     appendLine(
                         "\n\t\t\troute = ${hostName}NavigationScreens.${
-                            it.toString().replaceScreenWord()
+                            it.toString().replaceScreenWord(screenSuffix)
                         }.route,"
                     )
                     append(animation)
@@ -43,7 +47,7 @@ internal class NavHostContentGenerator(
                 } else {
                     appendLine(
                         "\n\t\t\troute = ${hostName}NavigationScreens.${
-                            it.toString().replaceScreenWord()
+                            it.toString().replaceScreenWord(screenSuffix)
                         }.route,"
                     )
                     appendLine("\t\t\targuments = listOf(")
@@ -92,6 +96,18 @@ internal class NavHostContentGenerator(
 
             if (viewModelInjector != ViewModelInjector.None) {
                 appendLine(viewModelInjector.getInjectorImport())
+
+                // The generated call is `koinViewModel<MyViewModel>()`/`viewModel<MyViewModel>()`
+                // - the ViewModel's own type needs importing too, just like the screen function
+                // above. Without this, it's an unresolved reference whenever the ViewModel lives
+                // in a different package than this generated file (i.e. always, by design - see
+                // the packageName ".navigation" suffix).
+                functionList
+                    .flatMap { it.parameters }
+                    .filter { it.isViewModel() }
+                    .mapNotNull { it.type.resolve().declaration.qualifiedName?.asString() }
+                    .distinct()
+                    .forEach { appendLine("import $it") }
             }
 
             append("\n")
@@ -103,11 +119,11 @@ internal class NavHostContentGenerator(
         hostName: String,
     ) = buildString {
         val startDestination = functionList.firstOrNull {
-            it.annotationParameterByName<Boolean>(
+            it.booleanAnnotationParameterByName(
                 KoGenScreen::class, "startDestination"
             )
         } ?: functionList.first()
-        val startDestinationName = startDestination.toString().replaceScreenWord()
+        val startDestinationName = startDestination.toString().replaceScreenWord(screenSuffix)
 
         appendLine("@Composable")
         appendLine("fun $hostName(")
@@ -178,14 +194,20 @@ fun KSValueParameter.isNavHostController(): Boolean {
     return type.toString() == "NavHostController"
 }
 
+private const val VIEW_MODEL_QUALIFIED_NAME = "androidx.lifecycle.ViewModel"
+
+/**
+ * True if this parameter's type is (or extends, however deep) `androidx.lifecycle.ViewModel` -
+ * checked via the resolved type hierarchy, not by guessing from how the default value is
+ * obtained. That used to be detected by string-matching the parameter's default value expression
+ * against the literal text "viewModel" - which silently missed anything obtained any other way
+ * (`hiltViewModel()`, `koinViewModel()` called directly, a custom factory function, or no default
+ * value at all) and quietly treated it as a regular route parameter instead.
+ */
 fun KSValueParameter.isViewModel(): Boolean {
-    var currentParent = type.parent
-    do {
-        if (currentParent.toString() == "viewModel") {
-            return true
-        } else {
-            currentParent = currentParent?.parent
-        }
-    } while (currentParent != null)
-    return false
+    val declaration = type.resolve().declaration as? KSClassDeclaration ?: return false
+    if (declaration.qualifiedName?.asString() == VIEW_MODEL_QUALIFIED_NAME) return true
+    return declaration.getAllSuperTypes().any {
+        it.declaration.qualifiedName?.asString() == VIEW_MODEL_QUALIFIED_NAME
+    }
 }

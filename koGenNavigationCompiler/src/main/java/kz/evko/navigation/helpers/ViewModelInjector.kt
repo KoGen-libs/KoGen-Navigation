@@ -6,7 +6,7 @@ enum class ViewModelInjector(
     private val injectorImport: String
 ) {
     Koin("koin", "koinViewModel", "import org.koin.androidx.compose.koinViewModel"),
-    Hilt("hilt", "viewModel", ""),
+    Hilt("hilt", "viewModel", "import androidx.lifecycle.viewmodel.compose.viewModel"),
     None("", "", "");
 
     fun getInjectorName(type: String): String {

@@ -38,9 +38,12 @@ class ViewModelInjectorTest {
     }
 
     @Test
-    fun `Hilt injects via viewModel with no extra import`() {
+    fun `Hilt injects via viewModel and imports the generic viewModel() composable`() {
         assertEquals(" = viewModel<MyViewModel>(),", ViewModelInjector.Hilt.getInjectorName("MyViewModel"))
-        assertEquals("", ViewModelInjector.Hilt.getInjectorImport())
+        assertEquals(
+            "import androidx.lifecycle.viewmodel.compose.viewModel",
+            ViewModelInjector.Hilt.getInjectorImport(),
+        )
     }
 
     @Test

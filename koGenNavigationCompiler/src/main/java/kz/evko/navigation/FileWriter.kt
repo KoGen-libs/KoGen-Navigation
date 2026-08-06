@@ -25,7 +25,7 @@ internal class FileWriter(
             !it.isNullOrEmpty()
         } ?: run {
             val packageParts = functions.firstOrNull()?.packageName?.asString()?.split(".")
-            packageParts?.subList(0, 3)?.joinToString(".")?.plus(".navigation")
+            packageParts?.take(3)?.joinToString(".")?.plus(".navigation")
                 ?: "kz.evko.navigation"
         }
     }
@@ -35,12 +35,13 @@ internal class FileWriter(
         name: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
+        screenSuffix: String?,
     ) {
         if (!screensFunctions.iterator().hasNext()) return
 
         try {
             val fileName = "${name}NavigationScreens"
-            val screenListContentGenerator = ScreenListGenerator(packageName)
+            val screenListContentGenerator = ScreenListGenerator(packageName, screenSuffix)
             val content = screenListContentGenerator.generateScreenList(
                 screensFunctions.toList(),
                 fileName,
@@ -57,6 +58,7 @@ internal class FileWriter(
                 name = name,
                 viewModelInjector = viewModelInjector,
                 defaultAnimation = defaultAnimation,
+                screenSuffix = screenSuffix,
             )
         } catch (e: Exception) {
             logger.info("Exception: ${e.message}")
@@ -67,8 +69,9 @@ internal class FileWriter(
         screensFunctions: List<KSFunctionDeclaration>, name: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
+        screenSuffix: String?,
     ) {
-        val navHostContentGenerator = NavHostContentGenerator(packageName)
+        val navHostContentGenerator = NavHostContentGenerator(packageName, screenSuffix)
         val navHostContent = navHostContentGenerator.generateNavHost(
             functionList = screensFunctions.toList(),
             hostName = name,
@@ -82,9 +85,9 @@ internal class FileWriter(
         navHostFile.close()
     }
 
-    fun createRoutes(screensFunctions: List<KSFunctionDeclaration>) {
+    fun createRoutes(screensFunctions: List<KSFunctionDeclaration>, screenSuffix: String?) {
         try {
-            val routesContentGenerator = RoutesListGenerator(packageName)
+            val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix)
 
             val routesContent = routesContentGenerator.generateRoutes(
                 screensFunctions.toList(),
@@ -101,7 +104,8 @@ internal class FileWriter(
 
     fun createExtensions() {
         try {
-            val routesContentGenerator = RoutesListGenerator(packageName)
+            // No screen name to strip a suffix from here - generateExtensions() doesn't use it.
+            val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix = null)
             val extensionsFile: OutputStream =
                 createFile(emptyList(), "NavigationExtensions")
             extensionsFile += routesContentGenerator.generateExtensions()
@@ -131,26 +135,60 @@ internal operator fun OutputStream.plusAssign(text: String) {
 internal fun List<KSDeclaration>.toFileList(): List<KSFile> =
     mapNotNull { it.containingFile }
 
-internal fun <T> KSFunctionDeclaration.annotationParameterByName(
+private fun KSFunctionDeclaration.rawAnnotationParameterValue(
     annotationClass: KClass<*>,
-    parameterName: String
-): T {
+    parameterName: String,
+): Any? {
     val annotation =
         annotations.first { it.shortName.asString() == annotationClass.simpleName.toString() }
-    val name = annotation.arguments.first { it.name?.asString() == parameterName }
-    return name.value as T
+    return annotation.arguments.first { it.name?.asString() == parameterName }.value
 }
 
+/**
+ * Reads [parameterName] off an annotation of type [annotationClass], as-is (e.g. `navHostName`
+ * on `@KoGenScreen`, which is declared as a plain `String`).
+ *
+ * Was previously a `fun <T> ...(): T { ... return value as T }` - a non-reified generic cast is
+ * erased to `as Any?` at the bytecode level, so it can never actually fail *here*; a caller
+ * mismatching `T` against the parameter's real type wouldn't get a `ClassCastException` until
+ * some unrelated point downstream where the value is finally used as that (wrong) type. Splitting
+ * it into one dedicated, safely-cast function per concrete type actually used fails at the source
+ * of the problem instead.
+ */
+internal fun KSFunctionDeclaration.stringAnnotationParameterByName(
+    annotationClass: KClass<*>,
+    parameterName: String,
+): String = rawAnnotationParameterValue(annotationClass, parameterName) as? String ?: ""
+
+/** Same as [stringAnnotationParameterByName], for a `Boolean`-typed annotation parameter (e.g. `startDestination`). */
+internal fun KSFunctionDeclaration.booleanAnnotationParameterByName(
+    annotationClass: KClass<*>,
+    parameterName: String,
+): Boolean = rawAnnotationParameterValue(annotationClass, parameterName) as? Boolean ?: false
+
+/**
+ * Reads [parameterName] off an annotation of type [annotationClass] and stringifies it, keeping
+ * only the part after the last `.` - meant for an enum-typed parameter (e.g. `animation` on
+ * `@KoGenScreen`), whose value prints as its fully-qualified name
+ * (`kz.evko.navigation.helpers.NavigationAnimation.SlideLeft`) and needs just the entry's own name
+ * (`SlideLeft`) to match against `NavigationAnimation.entries`.
+ */
 internal fun KSFunctionDeclaration.annotationParameterByName(
     annotationClass: KClass<*>,
     parameterName: String
-): String {
-    val annotation =
-        annotations.first { it.shortName.asString() == annotationClass.simpleName.toString() }
-    val name = annotation.arguments.first { it.name?.asString() == parameterName }
-    return name.value?.toString()?.split(".")?.lastOrNull() ?: ""
-}
+): String = rawAnnotationParameterValue(annotationClass, parameterName)
+    ?.toString()?.split(".")?.lastOrNull() ?: ""
 
-internal fun String.replaceScreenWord(): String {
-    return replace("screen", "", ignoreCase = true)
+/**
+ * Strips [suffix] from this screen function's name, used to derive its route/enum-entry/action
+ * name (e.g. "HomeScreen" -> "Home"). Only the *last* occurrence is removed, so a name that
+ * happens to contain [suffix] earlier too (e.g. "ScreenshotScreen") keeps that part intact
+ * ("Screenshot", not "hot"). No [suffix] configured (null/blank - the `screenSuffix` KSP option
+ * wasn't set) means nothing is stripped at all.
+ */
+internal fun String.replaceScreenWord(suffix: String?): String {
+    if (suffix.isNullOrEmpty()) return this
+    val index = lastIndexOf(suffix, ignoreCase = true)
+    if (index == -1) return this
+    return removeRange(index, index + suffix.length)
 }
