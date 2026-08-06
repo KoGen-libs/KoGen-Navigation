@@ -67,5 +67,5 @@ dependencies {
     implementation(libs.koin)
 
     implementation(project(":koGenNavigation"))
-    "ksp"(project(":koGenNavigation"))
+    "ksp"(project(":koGenNavigationCompiler"))
 }

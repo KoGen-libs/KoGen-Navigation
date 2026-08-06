@@ -19,12 +19,9 @@ kotlin {
     jvmToolchain(17)
 }
 
-sourceSets.main {
-    java.srcDirs("src/main/kotlin")
-}
-
 dependencies {
-    api(libs.gson)
+    implementation(libs.symbol.processing)
+    implementation(project(":koGenNavigation"))
 
     constraints {
         implementation("org.apache.commons:commons-compress:1.26.2") {
@@ -39,11 +36,11 @@ publishing {
             from(components["java"])
 
             groupId = properties["GROUP"].toString()
-            artifactId = "navigation-compose"
+            artifactId = "navigation-compose-compiler"
 
             pom {
-                name.set("KoGen Navigation")
-                description.set("A library for navigation in compose")
+                name.set("KoGen Navigation Compiler")
+                description.set("KSP symbol processor that generates the compose navigation code for KoGen Navigation")
                 url.set("https://github.com/EugenProg/KoGen-navigation_demo")
 
                 licenses {

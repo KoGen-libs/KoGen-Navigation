@@ -26,5 +26,6 @@ deploy:
         active: 'ALWAYS'
         stagingRepositories:
           - 'koGenNavigation/build/staging-deploy'
+          - 'koGenNavigationCompiler/build/staging-deploy'
         url: 'https://central.sonatype.com/api/v1/publisher'
         namespace: 'io.github.eugenprog'
