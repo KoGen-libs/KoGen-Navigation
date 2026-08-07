@@ -195,15 +195,20 @@ enum class ArgumentTypes(
             }
         }
 
+        // No hardcoded indentation here: this is embedded via KotlinPoet's `%L`, which already
+        // applies the correct indentation for whatever level it's embedded at to every line of a
+        // multi-line value - hand-adding our own absolute tabs on top just doubled up on it.
+        // One relative tab for the block's own inner lines is enough to tell them apart from the
+        // "navArgument(...) {"/"}," lines around them.
         fun getNavArgsString(parameter: KSValueParameter): String {
             val isNullable = parameter.type.resolve().isMarkedNullable
             val type = findType(parameter) ?: StringType
             return buildString {
-                appendLine("\t\t\t\tnavArgument(\"${parameter.name?.asString()}\") {")
-                appendLine("\t\t\t\t\tdefaultValue = ${if (isNullable) "null" else type.defaultValue}")
-                appendLine("\t\t\t\t\ttype = ${type.navArgType}")
-                appendLine("\t\t\t\t\tnullable = $isNullable")
-                append("\t\t\t\t},")
+                appendLine("navArgument(\"${parameter.name?.asString()}\") {")
+                appendLine("\tdefaultValue = ${if (isNullable) "null" else type.defaultValue}")
+                appendLine("\ttype = ${type.navArgType}")
+                appendLine("\tnullable = $isNullable")
+                append("},")
             }
         }
     }

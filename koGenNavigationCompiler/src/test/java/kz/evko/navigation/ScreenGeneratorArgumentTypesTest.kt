@@ -13,6 +13,13 @@ import org.junit.jupiter.api.Test
  */
 class ScreenGeneratorArgumentTypesTest {
 
+    /** Content of a `navArgument("name") { ... }` block, whitespace collapsed to single spaces. */
+    private fun navArgumentBlock(name: String, source: String): String {
+        val start = source.indexOf("navArgument(\"$name\") {").let { source.indexOf("{", it) } + 1
+        val end = source.indexOf("}", start)
+        return source.substring(start, end).trim().replace(Regex("\\s+"), " ")
+    }
+
     @Test
     fun `scalar parameter types compile and wire up NavType, defaultValue and bundle getters`() {
         val result = compileScreens(
@@ -80,15 +87,15 @@ class ScreenGeneratorArgumentTypesTest {
         assertEquals(ExitCode.OK, result.exitCode, result.messages)
 
         val navHost = result.generatedFile("AppNavHost.kt")
-        assertTrue(
-            navHost.contains(
-                "navArgument(\"id\") {\n\t\t\t\t\tdefaultValue = null\n\t\t\t\t\ttype = NavType.StringType\n\t\t\t\t\tnullable = true",
-            ),
+        // Whitespace-tolerant: KotlinPoet applies its own indentation on top of this fragment's
+        // own embedded whitespace, so the exact run of tabs/spaces between tokens isn't stable.
+        assertEquals(
+            "defaultValue = null type = NavType.StringType nullable = true",
+            navArgumentBlock("id", navHost),
         )
-        assertTrue(
-            navHost.contains(
-                "navArgument(\"count\") {\n\t\t\t\t\tdefaultValue = 0\n\t\t\t\t\ttype = NavType.IntType\n\t\t\t\t\tnullable = false",
-            ),
+        assertEquals(
+            "defaultValue = 0 type = NavType.IntType nullable = false",
+            navArgumentBlock("count", navHost),
         )
 
         val routes = result.generatedFile("NavigationRoutes.kt")
@@ -127,7 +134,10 @@ class ScreenGeneratorArgumentTypesTest {
         )
 
         val routes = result.generatedFile("NavigationRoutes.kt")
-        assertTrue(routes.contains("profile: test.app.screens.UserProfile,"))
+        // KotlinPoet imports the custom type and uses its short name here (unlike the bundle-getter
+        // above, which is still built as raw text - see the "KotlinPoet migration" tasks).
+        assertTrue(routes.contains("import test.app.screens.UserProfile"))
+        assertTrue(routes.contains("profile: UserProfile,"))
         assertTrue(routes.contains("profile=\${com.google.gson.Gson().toJson(profile)}"))
     }
 
@@ -163,7 +173,7 @@ class ScreenGeneratorArgumentTypesTest {
         )
 
         val routes = result.generatedFile("NavigationRoutes.kt")
-        assertTrue(routes.contains("profile: test.app.screens.UserProfile?,"))
+        assertTrue(routes.contains("profile: UserProfile?,"))
     }
 
     @Test
@@ -199,7 +209,7 @@ class ScreenGeneratorArgumentTypesTest {
         )
 
         val routes = result.generatedFile("NavigationRoutes.kt")
-        assertTrue(routes.contains("profiles: kotlin.collections.List<test.app.screens.UserProfile>,"))
+        assertTrue(routes.contains("profiles: List<UserProfile>,"))
     }
 
     @Test

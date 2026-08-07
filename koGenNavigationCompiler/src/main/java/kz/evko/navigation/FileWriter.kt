@@ -6,12 +6,13 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.ksp.writeTo
 import kz.evko.navigation.contentGenerators.NavHostContentGenerator
 import kz.evko.navigation.contentGenerators.RoutesListGenerator
 import kz.evko.navigation.contentGenerators.ScreenListGenerator
 import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjector
-import java.io.OutputStream
 import kotlin.reflect.KClass
 
 internal class FileWriter(
@@ -39,30 +40,22 @@ internal class FileWriter(
     ) {
         if (!screensFunctions.iterator().hasNext()) return
 
-        try {
-            val fileName = "${name}NavigationScreens"
-            val screenListContentGenerator = ScreenListGenerator(packageName, screenSuffix)
-            val content = screenListContentGenerator.generateScreenList(
-                screensFunctions.toList(),
-                fileName,
-                logger,
-            )
+        val fileName = "${name}NavigationScreens"
+        val screenListContentGenerator = ScreenListGenerator(packageName, screenSuffix)
+        val fileSpec = screenListContentGenerator.generateScreenList(
+            screensFunctions.toList(),
+            fileName,
+            logger,
+        )
+        fileSpec.writeToGenerated(screensFunctions)
 
-            val file: OutputStream =
-                createFile(screensFunctions.toFileList(), fileName)
-            file += content
-            file.close()
-
-            createNavHost(
-                screensFunctions = screensFunctions,
-                name = name,
-                viewModelInjector = viewModelInjector,
-                defaultAnimation = defaultAnimation,
-                screenSuffix = screenSuffix,
-            )
-        } catch (e: Exception) {
-            logger.info("Exception: ${e.message}")
-        }
+        createNavHost(
+            screensFunctions = screensFunctions,
+            name = name,
+            viewModelInjector = viewModelInjector,
+            defaultAnimation = defaultAnimation,
+            screenSuffix = screenSuffix,
+        )
     }
 
     private fun createNavHost(
@@ -72,64 +65,36 @@ internal class FileWriter(
         screenSuffix: String?,
     ) {
         val navHostContentGenerator = NavHostContentGenerator(packageName, screenSuffix)
-        val navHostContent = navHostContentGenerator.generateNavHost(
+        val fileSpec = navHostContentGenerator.generateNavHost(
             functionList = screensFunctions.toList(),
             hostName = name,
             viewModelInjector = viewModelInjector,
             defaultAnimation = defaultAnimation,
         )
-
-        val navHostFile: OutputStream =
-            createFile(screensFunctions.toFileList(), name)
-        navHostFile += navHostContent
-        navHostFile.close()
+        fileSpec.writeToGenerated(screensFunctions)
     }
 
     fun createRoutes(screensFunctions: List<KSFunctionDeclaration>, screenSuffix: String?) {
-        try {
-            val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix)
-
-            val routesContent = routesContentGenerator.generateRoutes(
-                screensFunctions.toList(),
-            )
-
-            val routesFile: OutputStream =
-                createFile(screensFunctions.toFileList(), "NavigationRoutes")
-            routesFile += routesContent
-            routesFile.close()
-        } catch (e: Exception) {
-            logger.info("Exception: ${e.message}")
-        }
+        val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix)
+        val fileSpec = routesContentGenerator.generateRoutes(screensFunctions.toList())
+        fileSpec.writeToGenerated(screensFunctions)
     }
 
     fun createExtensions() {
-        try {
-            // No screen name to strip a suffix from here - generateExtensions() doesn't use it.
-            val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix = null)
-            val extensionsFile: OutputStream =
-                createFile(emptyList(), "NavigationExtensions")
-            extensionsFile += routesContentGenerator.generateExtensions()
-            extensionsFile.close()
-        } catch (e: Exception) {
-            logger.info("Exception: ${e.message}")
-        }
+        // No screen name to strip a suffix from here - generateExtensions() doesn't use it.
+        val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix = null)
+        routesContentGenerator.generateExtensions().writeToGenerated(emptyList())
     }
 
-    private fun createFile(
-        files: List<KSFile>,
-        fileName: String,
-    ) = codeGenerator.createNewFile(
-        Dependencies(
-            true,
-            *files.toList().toTypedArray(),
-        ),
-        packageName,
-        fileName
-    )
-}
-
-internal operator fun OutputStream.plusAssign(text: String) {
-    write(text.toByteArray())
+    /**
+     * Writes this [FileSpec] out via the kotlinpoet-ksp helper - it derives the target
+     * package/file name straight from the [FileSpec] itself (matching what we built it with),
+     * instead of us re-deriving [Dependencies] and a raw [CodeGenerator.createNewFile] call by
+     * hand for every single generated file, as before.
+     */
+    private fun FileSpec.writeToGenerated(screensFunctions: List<KSFunctionDeclaration>) {
+        writeTo(codeGenerator, Dependencies(true, *screensFunctions.toFileList().toTypedArray()))
+    }
 }
 
 internal fun List<KSDeclaration>.toFileList(): List<KSFile> =
