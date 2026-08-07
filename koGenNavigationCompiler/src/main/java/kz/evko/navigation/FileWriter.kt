@@ -64,7 +64,7 @@ internal class FileWriter(
         defaultAnimation: NavigationAnimation,
         screenSuffix: String?,
     ) {
-        val navHostContentGenerator = NavHostContentGenerator(packageName, screenSuffix)
+        val navHostContentGenerator = NavHostContentGenerator(packageName, screenSuffix, logger)
         val fileSpec = navHostContentGenerator.generateNavHost(
             functionList = screensFunctions.toList(),
             hostName = name,
@@ -130,6 +130,18 @@ internal fun KSFunctionDeclaration.booleanAnnotationParameterByName(
     annotationClass: KClass<*>,
     parameterName: String,
 ): Boolean = rawAnnotationParameterValue(annotationClass, parameterName) as? Boolean ?: false
+
+/**
+ * Same as [stringAnnotationParameterByName], for an `Array<String>`-typed annotation parameter
+ * (e.g. `deepLinks`). KSP hands back an array-valued annotation argument as a `List<*>` (not an
+ * actual array), so this reads it as one and filters down to the `String` entries.
+ */
+internal fun KSFunctionDeclaration.stringListAnnotationParameterByName(
+    annotationClass: KClass<*>,
+    parameterName: String,
+): List<String> = (rawAnnotationParameterValue(annotationClass, parameterName) as? List<*>)
+    .orEmpty()
+    .filterIsInstance<String>()
 
 /**
  * Reads [parameterName] off an annotation of type [annotationClass] and stringifies it, keeping
