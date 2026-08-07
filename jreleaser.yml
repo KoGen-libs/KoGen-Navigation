@@ -9,15 +9,6 @@ project:
     java:
       groupId: 'io.github.eugenprog'
 
-release:
-  github:
-    branch: 'master'
-    # Тег для релиза создаёшь и пушишь ты сам (только у Admin-роли есть право
-    # создавать теги - см. ruleset "Protect all tags"). Без skipTag JReleaser
-    # пытается сам создать/пересоздать тег (force + GPG-подпись) от имени
-    # CI-бота, что GitHub блокирует как попытку создания защищённого тега.
-    skipTag: true
-
 # Настройки GPG-подписи
 signing:
   active: ALWAYS
