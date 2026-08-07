@@ -1,6 +1,7 @@
 package kz.evko.navigation.contentGenerators
 
 import com.google.devtools.ksp.getAllSuperTypes
+import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
@@ -18,16 +19,20 @@ import kz.evko.navigation.booleanAnnotationParameterByName
 import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.replaceScreenWord
+import kz.evko.navigation.stringListAnnotationParameterByName
 
 internal class NavHostContentGenerator(
     private val packageName: String,
     private val screenSuffix: String?,
+    private val logger: KSPLogger,
 ) {
     private val composableAnnotation = ClassName("androidx.compose.runtime", "Composable")
     private val modifierType = ClassName("androidx.compose.ui", "Modifier")
     private val navHostControllerType = ClassName("androidx.navigation", "NavHostController")
     private val navHostMember = MemberName("androidx.navigation.compose", "NavHost")
     private val composableMember = MemberName("androidx.navigation.compose", "composable")
+    private val navDeepLinkMember = MemberName("androidx.navigation", "navDeepLink")
+    private val deepLinkPlaceholder = Regex("\\{(\\w+)}")
 
     fun generateNavHost(
         functionList: List<KSFunctionDeclaration>,
@@ -98,6 +103,8 @@ internal class NavHostContentGenerator(
         val screenFunction = MemberName(function.packageName.asString(), function.simpleName.asString())
         val params = function.parameters.filter { !it.isNavHostController() && !it.isViewModel() }
         val animation = function.getAnimationType(defaultAnimation).type.buildAnimationContent()
+        val deepLinks = function.stringListAnnotationParameterByName(KoGenScreen::class, "deepLinks")
+        warnAboutUnknownDeepLinkPlaceholders(deepLinks, params, screenEntryName)
 
         add("%M(\n", composableMember)
         indent()
@@ -106,6 +113,13 @@ internal class NavHostContentGenerator(
             add("arguments = listOf(\n")
             indent()
             params.forEach { param -> add("%L\n", ArgumentTypes.getNavArgsString(param)) }
+            unindent()
+            add("),\n")
+        }
+        if (deepLinks.isNotEmpty()) {
+            add("deepLinks = listOf(\n")
+            indent()
+            deepLinks.forEach { pattern -> add("%M { uriPattern = %S },\n", navDeepLinkMember, pattern) }
             unindent()
             add("),\n")
         }
@@ -125,6 +139,32 @@ internal class NavHostContentGenerator(
 
         endControlFlow()
         return this
+    }
+
+    /**
+     * Warns (doesn't fail the build) about any `{placeholder}` in a screen's `deepLinks` that
+     * doesn't match one of its route parameters - `navDeepLink`'s pattern matching is entirely
+     * runtime, so a typo'd or stale placeholder wouldn't otherwise surface until the deep link
+     * silently fails to fill that argument.
+     */
+    private fun warnAboutUnknownDeepLinkPlaceholders(
+        deepLinks: List<String>,
+        params: List<KSValueParameter>,
+        screenEntryName: String,
+    ) {
+        if (deepLinks.isEmpty()) return
+        val paramNames = params.mapNotNull { it.name?.asString() }.toSet()
+        deepLinks.forEach { pattern ->
+            deepLinkPlaceholder.findAll(pattern).map { it.groupValues[1] }.forEach { placeholder ->
+                if (placeholder !in paramNames) {
+                    logger.warn(
+                        "@KoGenScreen deepLinks: '{$placeholder}' in \"$pattern\" for screen " +
+                            "'$screenEntryName' does not match any of its parameters " +
+                            "(${paramNames.ifEmpty { setOf("<none>") }})",
+                    )
+                }
+            }
+        }
     }
 
     private fun generateScreenParameters(

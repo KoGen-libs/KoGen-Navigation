@@ -150,6 +150,13 @@ internal val androidStubSources: List<SourceFile> = listOf(
         fun navArgument(name: String, builder: NavArgumentBuilder.() -> Unit): NamedNavArgument =
             NamedNavArgument()
 
+        class NavDeepLink
+        class NavDeepLinkDslBuilder {
+            var uriPattern: String? = null
+        }
+
+        fun navDeepLink(builder: NavDeepLinkDslBuilder.() -> Unit): NavDeepLink = NavDeepLink()
+
         object NavType {
             val BoolType: Any = Any()
             val StringType: Any = Any()
@@ -193,6 +200,7 @@ internal val androidStubSources: List<SourceFile> = listOf(
         import androidx.compose.ui.unit.SizeLike
         import androidx.navigation.NamedNavArgument
         import androidx.navigation.NavBackStackEntry
+        import androidx.navigation.NavDeepLink
         import androidx.navigation.NavHostController
 
         fun NavHost(
@@ -206,6 +214,7 @@ internal val androidStubSources: List<SourceFile> = listOf(
         fun composable(
             route: String,
             arguments: List<NamedNavArgument> = emptyList(),
+            deepLinks: List<NavDeepLink> = emptyList(),
             enterTransition: ((SizeLike) -> EnterTransition?)? = null,
             exitTransition: ((SizeLike) -> ExitTransition?)? = null,
             popEnterTransition: ((SizeLike) -> EnterTransition?)? = null,

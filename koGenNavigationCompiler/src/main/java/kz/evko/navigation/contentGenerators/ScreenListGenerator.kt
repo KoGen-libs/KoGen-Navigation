@@ -21,7 +21,7 @@ internal class ScreenListGenerator(
         className: String,
         logger: KSPLogger,
     ): FileSpec {
-        logger.warn("> for $className found ${functionList.size} screens")
+        logger.info("> for $className found ${functionList.size} screens")
 
         val stringType = String::class.asTypeName()
         val routeScreenType = ClassName("kz.evko.navigation.routes", "RouteScreenType")

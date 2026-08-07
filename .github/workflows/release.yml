@@ -42,6 +42,9 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
+      - name: Run tests
+        run: ./gradlew test
+
       - name: Build and create artifacts
         run: ./gradlew :koGenNavigationCommon:publish :koGenNavigation:publish :koGenNavigationCompiler:publish -Pversion=${{ steps.get_version.outputs.TAG_VERSION }}
 
