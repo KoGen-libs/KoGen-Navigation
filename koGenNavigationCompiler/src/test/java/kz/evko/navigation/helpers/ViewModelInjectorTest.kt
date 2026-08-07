@@ -1,12 +1,15 @@
 package kz.evko.navigation.helpers
 
+import com.squareup.kotlinpoet.MemberName
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 
 /**
  * [ViewModelInjector.diName] is read straight from the `viewModelInjector` KSP option
- * (see ScreenGeneratorProcessor), and getInjectorName/getInjectorImport are spliced verbatim
- * into the generated NavHost. Any change here changes generated code for every consumer.
+ * (see ScreenGeneratorProcessor). [ViewModelInjector.injectorFunction] is spliced into the
+ * generated NavHost via KotlinPoet's `%M`/`%T` - it's a real [MemberName], not a raw import
+ * string, so any change here changes generated code (and its imports) for every consumer.
  */
 class ViewModelInjectorTest {
 
@@ -33,22 +36,22 @@ class ViewModelInjectorTest {
 
     @Test
     fun `Koin injects via koinViewModel`() {
-        assertEquals(" = koinViewModel<MyViewModel>(),", ViewModelInjector.Koin.getInjectorName("MyViewModel"))
-        assertEquals("import org.koin.androidx.compose.koinViewModel", ViewModelInjector.Koin.getInjectorImport())
-    }
-
-    @Test
-    fun `Hilt injects via viewModel and imports the generic viewModel() composable`() {
-        assertEquals(" = viewModel<MyViewModel>(),", ViewModelInjector.Hilt.getInjectorName("MyViewModel"))
         assertEquals(
-            "import androidx.lifecycle.viewmodel.compose.viewModel",
-            ViewModelInjector.Hilt.getInjectorImport(),
+            MemberName("org.koin.androidx.compose", "koinViewModel"),
+            ViewModelInjector.Koin.injectorFunction,
         )
     }
 
     @Test
-    fun `None emits neither an assignment nor an import`() {
-        assertEquals("", ViewModelInjector.None.getInjectorName("MyViewModel"))
-        assertEquals("", ViewModelInjector.None.getInjectorImport())
+    fun `Hilt injects via the generic viewModel() composable`() {
+        assertEquals(
+            MemberName("androidx.lifecycle.viewmodel.compose", "viewModel"),
+            ViewModelInjector.Hilt.injectorFunction,
+        )
+    }
+
+    @Test
+    fun `None has no injector function at all`() {
+        assertNull(ViewModelInjector.None.injectorFunction)
     }
 }

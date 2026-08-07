@@ -2,6 +2,14 @@ package kz.evko.navigation.contentGenerators
 
 import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.ParameterSpec
+import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.asTypeName
 import kz.evko.navigation.replaceScreenWord
 
 internal class ScreenListGenerator(
@@ -12,38 +20,49 @@ internal class ScreenListGenerator(
         functionList: List<KSFunctionDeclaration>,
         className: String,
         logger: KSPLogger,
-    ): String {
+    ): FileSpec {
         logger.warn("> for $className found ${functionList.size} screens")
-        return buildString {
-            appendLine("package $packageName\n")
 
-            appendLine("enum class $className(override val route: String): kz.evko.navigation.routes.RouteScreenType {")
+        val stringType = String::class.asTypeName()
+        val routeScreenType = ClassName("kz.evko.navigation.routes", "RouteScreenType")
 
-            appendLine(
-                functionList.joinToString(
-                    separator = ",\n\t",
-                    prefix = "\t",
-                    postfix = ",",
-                ) {
-                    val params = it.parameters.filter { parameter ->
-                        !parameter.isViewModel() && !parameter.isNavHostController()
-                    }
-                    val screenName = it.toString().replaceScreenWord(screenSuffix)
-                    if (params.isEmpty()) "$screenName(\"${screenName.lowercase()}\")"
-                    else {
-                        screenName + "(\"" +
-                                screenName.lowercase() +
-                                params.joinToString(
-                                    separator = "&",
-                                    prefix = "?",
-                                ) { param ->
-                                    "${param}={$param}"
-                                } + "\")"
-                    }
-                }
+        val enumBuilder = TypeSpec.enumBuilder(className)
+            .addSuperinterface(routeScreenType)
+            .primaryConstructor(
+                FunSpec.constructorBuilder()
+                    .addParameter(ParameterSpec.builder("route", stringType).build())
+                    .build(),
+            )
+            .addProperty(
+                PropertySpec.builder("route", stringType)
+                    .addModifiers(KModifier.OVERRIDE)
+                    .initializer("route")
+                    .build(),
             )
 
-            append("}")
+        functionList.forEach { function ->
+            val params = function.parameters.filter { parameter ->
+                !parameter.isViewModel() && !parameter.isNavHostController()
+            }
+            val screenName = function.toString().replaceScreenWord(screenSuffix)
+            val route = if (params.isEmpty()) {
+                screenName.lowercase()
+            } else {
+                params.joinToString(separator = "&", prefix = "${screenName.lowercase()}?") { param ->
+                    "$param={$param}"
+                }
+            }
+
+            enumBuilder.addEnumConstant(
+                screenName,
+                TypeSpec.anonymousClassBuilder()
+                    .addSuperclassConstructorParameter("%S", route)
+                    .build(),
+            )
         }
+
+        return FileSpec.builder(packageName, className)
+            .addType(enumBuilder.build())
+            .build()
     }
 }

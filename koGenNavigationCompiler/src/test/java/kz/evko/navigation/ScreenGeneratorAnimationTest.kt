@@ -42,12 +42,14 @@ class ScreenGeneratorAnimationTest {
         assertEquals(ExitCode.OK, result.exitCode, result.messages)
         val navHost = result.generatedFile("AppNavHost.kt")
 
-        val homeBlock = navHost.substringAfter("AppNavHostNavigationScreens.Home.route,")
+        // Anchored on "route = ..." (the composable() call), not the bare enum reference - that
+        // now also appears earlier, as AppNavHost's own `startDestination` default value.
+        val homeBlock = navHost.substringAfter("route = AppNavHostNavigationScreens.Home.route,")
             .substringBefore("composable(")
         assertTrue(homeBlock.contains("androidx.compose.animation.slideIn("))
         assertFalse(homeBlock.contains("androidx.compose.animation.fadeIn()"))
 
-        val detailsBlock = navHost.substringAfter("AppNavHostNavigationScreens.Details.route,")
+        val detailsBlock = navHost.substringAfter("route = AppNavHostNavigationScreens.Details.route,")
         assertTrue(detailsBlock.contains("androidx.compose.animation.fadeIn()"))
         assertFalse(detailsBlock.contains("androidx.compose.animation.slideIn("))
     }

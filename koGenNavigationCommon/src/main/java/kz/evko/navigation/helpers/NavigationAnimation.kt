@@ -54,11 +54,15 @@ sealed class AnimationType {
         val popExit: Offset,
     ) : AnimationType()
 
+    // No absolute leading tabs here: whichever generator embeds this text (currently
+    // NavHostContentGenerator, via KotlinPoet's `%L`) already applies the correct indentation to
+    // every line of it for wherever it's embedded - hardcoding our own absolute tabs on top just
+    // doubled up on it. Relative tabs, starting from 0, are enough to keep the nesting readable.
     fun buildAnimationContent() = when (this) {
         None -> ""
         Fade -> buildString {
-            appendLine("\t\t\tenterTransition = { androidx.compose.animation.fadeIn() },")
-            appendLine("\t\t\texitTransition = { androidx.compose.animation.fadeOut() },")
+            appendLine("enterTransition = { androidx.compose.animation.fadeIn() },")
+            appendLine("exitTransition = { androidx.compose.animation.fadeOut() },")
         }
 
         is Slide -> buildString {
@@ -70,35 +74,35 @@ sealed class AnimationType {
     }
 
     private fun buildSlideInAnimation(transitionName: String, offset: Offset) = buildString {
-        appendLine("\t\t\t$transitionName = {")
-        appendLine("\t\t\t\tandroidx.compose.animation.slideIn(")
-        appendLine("\t\t\t\t\tinitialOffset = {")
+        appendLine("$transitionName = {")
+        appendLine("\tandroidx.compose.animation.slideIn(")
+        appendLine("\t\tinitialOffset = {")
         appendLine(
-            "\t\t\t\t\t\tandroidx.compose.ui.unit.IntOffset(${getOffset(offset.x)}, ${
+            "\t\t\tandroidx.compose.ui.unit.IntOffset(${getOffset(offset.x)}, ${
                 getOffset(
                     offset.y
                 )
             })"
         )
-        appendLine("\t\t\t\t\t}")
-        appendLine("\t\t\t\t)")
-        appendLine("\t\t\t},")
+        appendLine("\t\t}")
+        appendLine("\t)")
+        appendLine("},")
     }
 
     private fun buildSlideOutAnimation(transitionName: String, offset: Offset) = buildString {
-        appendLine("\t\t\t$transitionName = {")
-        appendLine("\t\t\t\tandroidx.compose.animation.slideOut(")
-        appendLine("\t\t\t\t\ttargetOffset = {")
+        appendLine("$transitionName = {")
+        appendLine("\tandroidx.compose.animation.slideOut(")
+        appendLine("\t\ttargetOffset = {")
         appendLine(
-            "\t\t\t\t\t\tandroidx.compose.ui.unit.IntOffset(${getOffset(offset.x)}, ${
+            "\t\t\tandroidx.compose.ui.unit.IntOffset(${getOffset(offset.x)}, ${
                 getOffset(
                     offset.y
                 )
             })"
         )
-        appendLine("\t\t\t\t\t}")
-        appendLine("\t\t\t\t)")
-        appendLine("\t\t\t},")
+        appendLine("\t\t}")
+        appendLine("\t)")
+        appendLine("},")
     }
 
     private fun getOffset(value: Float) =

@@ -4,173 +4,159 @@ import com.google.devtools.ksp.getAllSuperTypes
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.CodeBlock
+import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.MemberName
+import com.squareup.kotlinpoet.ParameterSpec
+import com.squareup.kotlinpoet.STRING
+import com.squareup.kotlinpoet.ksp.toTypeName
 import kz.evko.navigation.annotation.KoGenScreen
-import kz.evko.navigation.helpers.NavigationAnimation
-import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.annotationParameterByName
 import kz.evko.navigation.booleanAnnotationParameterByName
+import kz.evko.navigation.helpers.NavigationAnimation
+import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.replaceScreenWord
 
 internal class NavHostContentGenerator(
     private val packageName: String,
     private val screenSuffix: String?,
 ) {
+    private val composableAnnotation = ClassName("androidx.compose.runtime", "Composable")
+    private val modifierType = ClassName("androidx.compose.ui", "Modifier")
+    private val navHostControllerType = ClassName("androidx.navigation", "NavHostController")
+    private val navHostMember = MemberName("androidx.navigation.compose", "NavHost")
+    private val composableMember = MemberName("androidx.navigation.compose", "composable")
+
     fun generateNavHost(
         functionList: List<KSFunctionDeclaration>,
         hostName: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
-    ): String {
-        return buildString {
-            appendLine("package $packageName\n")
-
-            append(generateImports(functionList, viewModelInjector))
-
-            append(generateNavHostFunction(functionList, hostName))
-
-            functionList.forEach {
-                append(
-                    "\t\tcomposable("
-                )
-                val params = it.parameters.filter { parameter ->
-                    !parameter.isNavHostController() && !parameter.isViewModel()
-                }
-                val animation = it.getAnimationType(defaultAnimation).type.buildAnimationContent()
-                if (params.isEmpty()) {
-                    appendLine(
-                        "\n\t\t\troute = ${hostName}NavigationScreens.${
-                            it.toString().replaceScreenWord(screenSuffix)
-                        }.route,"
-                    )
-                    append(animation)
-                    appendLine("\t\t) {")
-                } else {
-                    appendLine(
-                        "\n\t\t\troute = ${hostName}NavigationScreens.${
-                            it.toString().replaceScreenWord(screenSuffix)
-                        }.route,"
-                    )
-                    appendLine("\t\t\targuments = listOf(")
-                    params.forEach { parameter ->
-                        appendLine(ArgumentTypes.getNavArgsString(parameter))
-                    }
-                    appendLine("\t\t\t),")
-                    append(animation)
-                    appendLine("\t\t) {")
-                }
-
-                if (it.parameters.isEmpty()) {
-                    appendLine("\t\t\t${it.simpleName.asString()}()")
-                } else {
-                    appendLine("\t\t\t${it.simpleName.asString()}(")
-
-                    append(generateScreenParameters(it, viewModelInjector))
-
-                    appendLine("\t\t\t)")
-                }
-                appendLine("\t\t}")
-            }
-
-            appendLine("\t}")
-            appendLine("}")
-        }
-    }
-
-    private fun generateImports(
-        functionList: List<KSFunctionDeclaration>,
-        viewModelInjector: ViewModelInjector,
-    ): String {
-        return buildString {
-            appendLine("import androidx.compose.runtime.Composable")
-            appendLine("import androidx.compose.ui.Modifier")
-            appendLine("import androidx.navigation.NavHostController")
-            appendLine("import androidx.navigation.NavType")
-            appendLine("import androidx.navigation.compose.NavHost")
-            appendLine("import androidx.navigation.compose.composable")
-            appendLine("import androidx.navigation.navArgument")
-            appendLine("import com.google.gson.Gson")
-
-            functionList.forEach {
-                appendLine("import ${it.packageName.asString()}.${it.simpleName.asString()}")
-            }
-
-            if (viewModelInjector != ViewModelInjector.None) {
-                appendLine(viewModelInjector.getInjectorImport())
-
-                // The generated call is `koinViewModel<MyViewModel>()`/`viewModel<MyViewModel>()`
-                // - the ViewModel's own type needs importing too, just like the screen function
-                // above. Without this, it's an unresolved reference whenever the ViewModel lives
-                // in a different package than this generated file (i.e. always, by design - see
-                // the packageName ".navigation" suffix).
-                functionList
-                    .flatMap { it.parameters }
-                    .filter { it.isViewModel() }
-                    .mapNotNull { it.type.resolve().declaration.qualifiedName?.asString() }
-                    .distinct()
-                    .forEach { appendLine("import $it") }
-            }
-
-            append("\n")
-        }
-    }
-
-    private fun generateNavHostFunction(
-        functionList: List<KSFunctionDeclaration>,
-        hostName: String,
-    ) = buildString {
+    ): FileSpec {
+        val screensEnum = ClassName(packageName, "${hostName}NavigationScreens")
         val startDestination = functionList.firstOrNull {
-            it.booleanAnnotationParameterByName(
-                KoGenScreen::class, "startDestination"
-            )
+            it.booleanAnnotationParameterByName(KoGenScreen::class, "startDestination")
         } ?: functionList.first()
         val startDestinationName = startDestination.toString().replaceScreenWord(screenSuffix)
 
-        appendLine("@Composable")
-        appendLine("fun $hostName(")
-        appendLine("\tmodifier: Modifier = Modifier,")
-        appendLine("\tnavController: NavHostController,")
-        appendLine("\tstartDestination: String = ${hostName}NavigationScreens.$startDestinationName.route")
-        appendLine(") {")
+        val hostFunction = FunSpec.builder(hostName)
+            .addAnnotation(composableAnnotation)
+            .addParameter(ParameterSpec.builder("modifier", modifierType).defaultValue("%T", modifierType).build())
+            .addParameter("navController", navHostControllerType)
+            .addParameter(
+                ParameterSpec.builder("startDestination", STRING)
+                    .defaultValue("%T.%L.route", screensEnum, startDestinationName)
+                    .build(),
+            )
+            .addCode(generateNavHostBody(functionList, hostName, viewModelInjector, defaultAnimation))
+            .build()
 
-        appendLine("\tNavHost(")
-        appendLine("\t\tmodifier = modifier,")
-        appendLine("\t\tnavController = navController,")
-        appendLine("\t\tstartDestination = startDestination")
-        appendLine("\t) {")
+        // ArgumentTypes'/AnimationType's generated fragments still reference these three by their
+        // bare/simple names as plain text (not through a %T/%M placeholder KotlinPoet can see), so
+        // they still need a manual, always-present import. The ViewModel injector function *and*
+        // the ViewModel type it's parameterized with, on the other hand, are both referenced via
+        // %M/%T below (see generateScreenParameters) - KotlinPoet auto-imports both from actual
+        // usage, so there's nothing to hand-collect for them here at all. That's exactly the class
+        // of bug this used to have (Hilt's injector function had no import; the ViewModel type
+        // argument's import was missing for every injector).
+        return FileSpec.builder(packageName, hostName)
+            .addImport("androidx.navigation", "NavType")
+            .addImport("androidx.navigation", "navArgument")
+            .addImport("com.google.gson", "Gson")
+            .addFunction(hostFunction)
+            .build()
+    }
+
+    private fun generateNavHostBody(
+        functionList: List<KSFunctionDeclaration>,
+        hostName: String,
+        viewModelInjector: ViewModelInjector,
+        defaultAnimation: NavigationAnimation,
+    ): CodeBlock = CodeBlock.builder()
+        .beginControlFlow(
+            "%M(modifier = modifier, navController = navController, startDestination = startDestination)",
+            navHostMember,
+        )
+        .apply {
+            functionList.forEach { function ->
+                addScreenComposable(function, hostName, viewModelInjector, defaultAnimation)
+            }
+        }
+        .endControlFlow()
+        .build()
+
+    private fun CodeBlock.Builder.addScreenComposable(
+        function: KSFunctionDeclaration,
+        hostName: String,
+        viewModelInjector: ViewModelInjector,
+        defaultAnimation: NavigationAnimation,
+    ): CodeBlock.Builder {
+        val screensEnum = ClassName(packageName, "${hostName}NavigationScreens")
+        val screenEntryName = function.toString().replaceScreenWord(screenSuffix)
+        val screenFunction = MemberName(function.packageName.asString(), function.simpleName.asString())
+        val params = function.parameters.filter { !it.isNavHostController() && !it.isViewModel() }
+        val animation = function.getAnimationType(defaultAnimation).type.buildAnimationContent()
+
+        add("%M(\n", composableMember)
+        indent()
+        add("route = %T.%L.route,\n", screensEnum, screenEntryName)
+        if (params.isNotEmpty()) {
+            add("arguments = listOf(\n")
+            indent()
+            params.forEach { param -> add("%L\n", ArgumentTypes.getNavArgsString(param)) }
+            unindent()
+            add("),\n")
+        }
+        if (animation.isNotEmpty()) add("%L", animation)
+        unindent()
+        beginControlFlow(")")
+
+        if (function.parameters.isEmpty()) {
+            add("%M()\n", screenFunction)
+        } else {
+            add("%M(\n", screenFunction)
+            indent()
+            add("%L", generateScreenParameters(function, viewModelInjector))
+            unindent()
+            add(")\n")
+        }
+
+        endControlFlow()
+        return this
     }
 
     private fun generateScreenParameters(
         function: KSFunctionDeclaration,
         viewModelInjector: ViewModelInjector,
-    ) = buildString {
+    ): CodeBlock = CodeBlock.builder().apply {
         function.parameters.forEach { parameter ->
             when {
                 parameter.isNavHostController() ->
-                    appendLine("\t\t\t\t${parameter.name?.asString()} = navController,")
+                    addStatement("%L = navController,", parameter.name?.asString())
 
                 parameter.isViewModel() -> {
-                    if (viewModelInjector != ViewModelInjector.None) {
-                        appendLine(
-                            "\t\t\t\t${parameter.name?.asString()}${
-                                viewModelInjector.getInjectorName(
-                                    parameter.type.toString()
-                                )
-                            }"
+                    val injectorFunction = viewModelInjector.injectorFunction
+                    if (injectorFunction != null) {
+                        addStatement(
+                            "%L = %M<%T>(),",
+                            parameter.name?.asString(),
+                            injectorFunction,
+                            parameter.type.resolve().toTypeName(),
                         )
                     }
                 }
 
                 else ->
-                    appendLine(
-                        "\t\t\t\t${parameter.name?.asString()} = ${
-                            ArgumentTypes.getArgumentString(
-                                parameter
-                            )
-                        },"
+                    addStatement(
+                        "%L = %L,",
+                        parameter.name?.asString(),
+                        ArgumentTypes.getArgumentString(parameter),
                     )
             }
         }
-    }
+    }.build()
 }
 
 fun KSFunctionDeclaration.getAnimationType(defaultAnimation: NavigationAnimation): NavigationAnimation {

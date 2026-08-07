@@ -22,6 +22,8 @@ kotlin {
 dependencies {
     implementation(libs.symbol.processing)
     implementation(project(":koGenNavigationCommon"))
+    implementation(libs.kotlinpoet)
+    implementation(libs.kotlinpoet.ksp)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
@@ -93,10 +95,11 @@ publishing {
     }
 }
 
-signing {
-    val signingKey = System.getenv("JRELEASER_GPG_SECRET_KEY")
-    val signingPassword = System.getenv("JRELEASER_GPG_PASSPHRASE")
-    useInMemoryPgpKeys(signingKey, signingPassword)
-
-    sign(publishing.publications["release"])
+val signingKey = System.getenv("JRELEASER_GPG_SECRET_KEY")
+val signingPassword = System.getenv("JRELEASER_GPG_PASSPHRASE")
+if (!signingKey.isNullOrBlank() && !signingPassword.isNullOrBlank()) {
+    signing {
+        useInMemoryPgpKeys(signingKey, signingPassword)
+        sign(publishing.publications["release"])
+    }
 }
