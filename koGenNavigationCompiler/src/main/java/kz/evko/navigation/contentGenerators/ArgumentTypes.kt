@@ -18,6 +18,23 @@ internal fun KSType.fullyQualifiedName(): String {
     return "$qualifiedName<${typeArgs.joinToString(", ")}>"
 }
 
+/**
+ * One entry per Kotlin parameter type that Jetpack Navigation's own [navArgType] system knows how
+ * to carry natively (as opposed to [ArgumentTypes.getArgumentString]'s Gson fallback for anything
+ * else). Each entry is every piece of source text needed to both declare and read back a route
+ * argument of that type:
+ *
+ * @property type The parameter type as printed by [KSType.toString], nullability stripped - matched
+ *   against in [findType].
+ * @property getArgumentString The `NavBackStackEntry.arguments` getter call, without its `("name")`
+ *   argument yet (e.g. `"it.arguments?.getBoolean"`).
+ * @property defaultArgumentString Appended after that getter call for a non-nullable parameter, to
+ *   turn its nullable result into the type's zero value (e.g. `" ?: false"`); a nullable parameter
+ *   skips this and keeps the `?`-typed result as-is.
+ * @property navArgType The matching `androidx.navigation.NavType` constant, as source text.
+ * @property defaultValue The literal used as `navArgument { defaultValue = ... }` for a
+ *   non-nullable parameter (a nullable one uses `null` instead - see [getNavArgsString]).
+ */
 enum class ArgumentTypes(
     private val type: String,
     private val getArgumentString: String,
@@ -165,10 +182,17 @@ enum class ArgumentTypes(
     );
 
     companion object {
+        /** The entry matching [parameter]'s type, or `null` if it needs the Gson fallback instead. */
         fun findType(parameter: KSValueParameter): ArgumentTypes? = entries.firstOrNull {
             it.type == parameter.type.resolve().toString().replace("?", "")
         }
 
+        /**
+         * Source text that reads [parameter] back out of `it: NavBackStackEntry` inside a screen's
+         * generated `composable(...)` call - a natively-typed `NavType` getter for a recognized
+         * type (see [findType]), or a `Gson().fromJson(...)` call against its JSON-encoded string
+         * argument for anything else.
+         */
         fun getArgumentString(parameter: KSValueParameter): String {
             val name = parameter.name?.asString()
             val type = findType(parameter)
@@ -200,6 +224,7 @@ enum class ArgumentTypes(
         // multi-line value - hand-adding our own absolute tabs on top just doubled up on it.
         // One relative tab for the block's own inner lines is enough to tell them apart from the
         // "navArgument(...) {"/"}," lines around them.
+        /** Source text of the `navArgument("name") { ... },` block declaring [parameter] on a `composable(...)` call. */
         fun getNavArgsString(parameter: KSValueParameter): String {
             val isNullable = parameter.type.resolve().isMarkedNullable
             val type = findType(parameter) ?: StringType

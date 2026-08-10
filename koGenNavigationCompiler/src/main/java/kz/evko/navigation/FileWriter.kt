@@ -15,12 +15,22 @@ import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjector
 import kotlin.reflect.KClass
 
+/**
+ * Owns the package name every generated file is written under, and dispatches to the three
+ * [ScreenListGenerator]/[NavHostContentGenerator]/[RoutesListGenerator] content generators,
+ * writing whatever [FileSpec] each of them builds via [writeToGenerated].
+ */
 internal class FileWriter(
     private val codeGenerator: CodeGenerator,
     private val logger: KSPLogger,
 ) {
     private var packageName = ""
 
+    /**
+     * Resolves [packageName] once per KSP run: the `packageName` KSP option if set, otherwise the
+     * first three segments of the first annotated screen's own package plus `.navigation`, falling
+     * back to `kz.evko.navigation` if there's no screen to infer one from at all.
+     */
     fun createPackageName(paramsPackageName: String?, functions: Sequence<KSFunctionDeclaration>) {
         packageName = paramsPackageName?.plus(".navigation").takeIf {
             !it.isNullOrEmpty()
@@ -31,6 +41,7 @@ internal class FileWriter(
         }
     }
 
+    /** Writes `<name>NavigationScreens.kt` for one `navHostName` group, then its `NavHost` via [createNavHost]. No-ops for an empty group. */
     fun createScreensList(
         screensFunctions: List<KSFunctionDeclaration>,
         name: String,
@@ -58,6 +69,7 @@ internal class FileWriter(
         )
     }
 
+    /** Writes `<name>.kt`, the `@Composable fun <name>(...)` `NavHost` for this group of screens. */
     private fun createNavHost(
         screensFunctions: List<KSFunctionDeclaration>, name: String,
         viewModelInjector: ViewModelInjector,
@@ -74,12 +86,14 @@ internal class FileWriter(
         fileSpec.writeToGenerated(screensFunctions)
     }
 
+    /** Writes `NavigationRoutes.kt` - every screen across every `navHostName` group gets an `ActionTo<Screen>`. */
     fun createRoutes(screensFunctions: List<KSFunctionDeclaration>, screenSuffix: String?) {
         val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix)
         val fileSpec = routesContentGenerator.generateRoutes(screensFunctions.toList())
         fileSpec.writeToGenerated(screensFunctions)
     }
 
+    /** Writes `NavigationExtensions.kt` - the fixed `navigateSafety`/`popBackSafety`/`getResultData` helpers. */
     fun createExtensions() {
         // No screen name to strip a suffix from here - generateExtensions() doesn't use it.
         val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix = null)
@@ -97,9 +111,11 @@ internal class FileWriter(
     }
 }
 
+/** The distinct source files these declarations came from - what a KSP [Dependencies] needs to track. */
 internal fun List<KSDeclaration>.toFileList(): List<KSFile> =
     mapNotNull { it.containingFile }
 
+/** Untyped annotation-argument lookup underlying every `...AnnotationParameterByName` helper below. */
 private fun KSFunctionDeclaration.rawAnnotationParameterValue(
     annotationClass: KClass<*>,
     parameterName: String,
