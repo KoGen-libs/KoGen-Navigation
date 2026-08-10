@@ -12,10 +12,15 @@ import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asTypeName
 import kz.evko.navigation.replaceScreenWord
 
+/**
+ * Builds the `<className>` enum implementing `RouteScreenType` - one entry per screen sharing a
+ * `navHostName`, each carrying the route pattern its `composable(...)` block is registered under.
+ */
 internal class ScreenListGenerator(
     private val packageName: String,
     private val screenSuffix: String?,
 ) {
+    /** @param className Becomes both the generated enum's name and its file name. */
     fun generateScreenList(
         functionList: List<KSFunctionDeclaration>,
         className: String,

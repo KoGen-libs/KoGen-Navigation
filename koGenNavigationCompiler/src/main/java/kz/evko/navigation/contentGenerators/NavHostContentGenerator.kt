@@ -21,6 +21,11 @@ import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.replaceScreenWord
 import kz.evko.navigation.stringListAnnotationParameterByName
 
+/**
+ * Builds the `@Composable fun <hostName>(navController, ...)` file for one group of screens
+ * sharing a `navHostName` - a `NavHost` with one `composable(...)` entry per screen, wiring up
+ * each screen's route arguments, `NavHostController`/`ViewModel` parameters, and transition.
+ */
 internal class NavHostContentGenerator(
     private val packageName: String,
     private val screenSuffix: String?,
@@ -34,6 +39,11 @@ internal class NavHostContentGenerator(
     private val navDeepLinkMember = MemberName("androidx.navigation", "navDeepLink")
     private val deepLinkPlaceholder = Regex("\\{(\\w+)}")
 
+    /**
+     * @param functionList Every `@KoGenScreen` function sharing [hostName] as their `navHostName`.
+     * @param hostName Becomes the generated function's name and file name.
+     * @return A [FileSpec] with the single `@Composable fun <hostName>(...)`, ready to write out.
+     */
     fun generateNavHost(
         functionList: List<KSFunctionDeclaration>,
         hostName: String,
@@ -74,6 +84,7 @@ internal class NavHostContentGenerator(
             .build()
     }
 
+    /** Source text of the `NavHost(...) { ... }` call - one [addScreenComposable] block per screen. */
     private fun generateNavHostBody(
         functionList: List<KSFunctionDeclaration>,
         hostName: String,
@@ -92,6 +103,11 @@ internal class NavHostContentGenerator(
         .endControlFlow()
         .build()
 
+    /**
+     * Appends one screen's `composable(route = ..., arguments = ..., deepLinks = ...) { ... }`
+     * block, calling the screen function itself as the entry's content with
+     * [generateScreenParameters].
+     */
     private fun CodeBlock.Builder.addScreenComposable(
         function: KSFunctionDeclaration,
         hostName: String,
@@ -167,6 +183,12 @@ internal class NavHostContentGenerator(
         }
     }
 
+    /**
+     * Source text of the arguments passed to the screen function's own call inside its
+     * `composable(...)` block - `navController` for its `NavHostController` parameter (if any),
+     * the DI-injected instance for its `ViewModel` parameter (if any), and [ArgumentTypes] reads
+     * for everything else.
+     */
     private fun generateScreenParameters(
         function: KSFunctionDeclaration,
         viewModelInjector: ViewModelInjector,
@@ -199,6 +221,7 @@ internal class NavHostContentGenerator(
     }.build()
 }
 
+/** This screen's own `animation`, or [defaultAnimation] if it left it unset ([NavigationAnimation.None]). */
 fun KSFunctionDeclaration.getAnimationType(defaultAnimation: NavigationAnimation): NavigationAnimation {
     val animationName = "animation"
     val animationType = this.annotationParameterByName(
@@ -216,6 +239,7 @@ fun KSFunctionDeclaration.getAnimationType(defaultAnimation: NavigationAnimation
     }
 }
 
+/** True for the one parameter (if any) meant to receive the `NavHost`'s own controller, not a route argument. */
 fun KSValueParameter.isNavHostController(): Boolean {
     return type.toString() == "NavHostController"
 }

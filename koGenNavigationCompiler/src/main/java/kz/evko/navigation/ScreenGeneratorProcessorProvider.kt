@@ -12,6 +12,7 @@ import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjector
 import kotlin.reflect.KClass
 
+/** KSP entry point (registered via `META-INF/services`) - builds one [ScreenGeneratorProcessor] per compilation. */
 class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {
     override fun create(environment: SymbolProcessorEnvironment): SymbolProcessor {
         val fileWriter = FileWriter(environment.codeGenerator, environment.logger)
@@ -19,6 +20,18 @@ class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {
     }
 }
 
+/**
+ * Finds every `@KoGenScreen`-annotated function, groups them by `navHostName`, and hands each
+ * group to [fileGenerator] to turn into a screens enum + `NavHost` - plus, project-wide, the
+ * routes/extensions files.
+ *
+ * Reads four KSP options (`ksp { arg(...) }` in the consuming module's build script), all
+ * optional:
+ * - `viewModelInjector` - a [ViewModelInjector.diName] (`"koin"`/`"hilt"`), default [ViewModelInjector.None].
+ * - `defaultAnimation` - a [NavigationAnimation.typeName], default [NavigationAnimation.None].
+ * - `packageName` - see [FileWriter.createPackageName].
+ * - `screenSuffix` - stripped from a screen function's name to derive its route/enum-entry/action name.
+ */
 internal class ScreenGeneratorProcessor(
     private val fileGenerator: FileWriter,
     private val args: Map<String, String>,
@@ -35,6 +48,7 @@ internal class ScreenGeneratorProcessor(
     // package - a stray duplicate file alongside the correct one.
     private var hasGeneratedExtensions = false
 
+    /** @return Every annotated function that isn't valid yet, for KSP to retry next round. */
     override fun process(resolver: Resolver): List<KSAnnotated> {
         val viewModelInjector = ViewModelInjector.entries.firstOrNull {
             it.diName == args["viewModelInjector"]
@@ -77,6 +91,7 @@ internal class ScreenGeneratorProcessor(
         return (screenFunctions).filterNot { it.validate() }.toList()
     }
 
+    /** Every function annotated with [kClass], regardless of which `navHostName` it belongs to. */
     private fun Resolver.findAnnotations(
         kClass: KClass<*>,
     ) = getSymbolsWithAnnotation(

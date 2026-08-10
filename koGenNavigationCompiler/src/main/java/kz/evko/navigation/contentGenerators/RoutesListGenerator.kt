@@ -15,12 +15,24 @@ import com.squareup.kotlinpoet.TypeVariableName
 import com.squareup.kotlinpoet.ksp.toTypeName
 import kz.evko.navigation.replaceScreenWord
 
+/**
+ * Builds `NavigationRoutes.kt` (one `ActionTo<Screen>` per screen, via [generateRoutes]) and
+ * `NavigationExtensions.kt` (the fixed `navigateSafety`/`popBackSafety`/`getResultData` helpers,
+ * via [generateExtensions]) - the two files every KSP round emits regardless of `navHostName`
+ * grouping.
+ */
 class RoutesListGenerator(
     private val packageName: String,
     private val screenSuffix: String? = null,
 ) {
     private val navigationAction = ClassName("kz.evko.navigation.routes", "NavigationAction")
 
+    /**
+     * One `ActionTo<Screen>` per screen in [functionList]: a parameterless `object` for a screen
+     * with no route arguments, otherwise a `class` whose constructor mirrors the screen function's
+     * own arguments and whose `route` is built from them (via [ArgumentTypes], or a Gson-encoded
+     * query parameter for anything [ArgumentTypes] doesn't recognize).
+     */
     fun generateRoutes(functionList: List<KSFunctionDeclaration>): FileSpec {
         val paramTypes: MutableMap<KSValueParameter, ArgumentTypes> = mutableMapOf()
         val fileBuilder = FileSpec.builder(packageName, "NavigationRoutes")
@@ -77,6 +89,13 @@ class RoutesListGenerator(
         return fileBuilder.build()
     }
 
+    /**
+     * The three helpers every consumer gets regardless of their screens: `navigateSafety` (logs,
+     * then navigates - with optional `popUpTo`), `popBackSafety` (logs, optionally stashes a
+     * `BackStackData` result, then pops), and `getResultData` (reads
+     * that result back out, clearing it by default). `BackStackData` isn't a compile dependency of
+     * this module, so it's referenced here by name rather than as a resolvable KDoc link.
+     */
     fun generateExtensions(): FileSpec {
         val navHostController = ClassName("androidx.navigation", "NavHostController")
         val routeScreenType = ClassName("kz.evko.navigation.routes", "RouteScreenType")
@@ -85,6 +104,15 @@ class RoutesListGenerator(
         val typeVariableT = TypeVariableName("T")
 
         val navigateSafety = FunSpec.builder("navigateSafety")
+            .addKdoc(
+                """
+                |Logs the navigation, then navigates to [action]'s route.
+                |
+                |@param action Screen to navigate to.
+                |@param popUpTo Also pop the back stack up to this destination first, if given.
+                |@param inclusive Whether [popUpTo] itself is popped too, not just what's above it.
+                """.trimMargin(),
+            )
             .receiver(navHostController)
             .addParameter("action", navigationAction)
             .addParameter(
@@ -110,6 +138,14 @@ class RoutesListGenerator(
             .build()
 
         val popBackSafety = FunSpec.builder("popBackSafety")
+            .addKdoc(
+                """
+                |Logs the pop, optionally stashes [backStackData] for the screen being returned to
+                |(read it back there via [getResultData]), then pops the back stack.
+                |
+                |@param backStackData Result to hand back to the previous screen, if any.
+                """.trimMargin(),
+            )
             .receiver(navHostController)
             .addParameter(
                 ParameterSpec.builder("backStackData", backStackData.parameterizedBy(STAR).copy(nullable = true))
@@ -141,6 +177,15 @@ class RoutesListGenerator(
             .build()
 
         val getResultData = FunSpec.builder("getResultData")
+            .addKdoc(
+                """
+                |Reads back a result previously stashed via [popBackSafety], or `null` if none was.
+                |
+                |@param data Which result slot to read.
+                |@param clearData Whether to clear the stashed value after reading it.
+                |@return The stashed value, or `null` if nothing was stashed.
+                """.trimMargin(),
+            )
             .addTypeVariable(typeVariableT)
             .receiver(navHostController)
             .addParameter("data", navigationResultKey.parameterizedBy(typeVariableT))
