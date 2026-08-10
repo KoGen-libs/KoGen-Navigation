@@ -186,6 +186,14 @@ internal val androidStubSources: List<SourceFile> = listOf(
             fun navigate(route: String, builder: NavOptionsBuilder.() -> Unit = {}) {}
             fun popBackStack() {}
         }
+
+        // Real shape, not simplified away: composable(...) is an *extension* on NavGraphBuilder,
+        // and NavHost's trailing lambda is a NavGraphBuilder receiver scope, not a plain () ->
+        // Unit - matters for buildMode = "module", whose generated fun NavGraphBuilder.XxxGraph(...)
+        // calls composable(...) bare, relying on it resolving against *its own* receiver, the same
+        // way NavHost's own trailing lambda does. A simplified stub wouldn't catch a graph
+        // extension that's broken in exactly that way.
+        class NavGraphBuilder
         """.trimIndent(),
     ),
     SourceFile.kotlin(
@@ -201,17 +209,18 @@ internal val androidStubSources: List<SourceFile> = listOf(
         import androidx.navigation.NamedNavArgument
         import androidx.navigation.NavBackStackEntry
         import androidx.navigation.NavDeepLink
+        import androidx.navigation.NavGraphBuilder
         import androidx.navigation.NavHostController
 
         fun NavHost(
             modifier: Modifier = Modifier,
             navController: NavHostController,
             startDestination: String,
-            builder: () -> Unit,
+            builder: NavGraphBuilder.() -> Unit,
         ) {
         }
 
-        fun composable(
+        fun NavGraphBuilder.composable(
             route: String,
             arguments: List<NamedNavArgument> = emptyList(),
             deepLinks: List<NavDeepLink> = emptyList(),

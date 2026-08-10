@@ -34,6 +34,7 @@ internal class NavHostContentGenerator(
     private val composableAnnotation = ClassName("androidx.compose.runtime", "Composable")
     private val modifierType = ClassName("androidx.compose.ui", "Modifier")
     private val navHostControllerType = ClassName("androidx.navigation", "NavHostController")
+    private val navGraphBuilderType = ClassName("androidx.navigation", "NavGraphBuilder")
     private val navHostMember = MemberName("androidx.navigation.compose", "NavHost")
     private val composableMember = MemberName("androidx.navigation.compose", "composable")
     private val navDeepLinkMember = MemberName("androidx.navigation", "navDeepLink")
@@ -84,6 +85,36 @@ internal class NavHostContentGenerator(
             .build()
     }
 
+    /**
+     * `NavGraphBuilder.<hostName>Graph(navController)` for [functionList] - the same
+     * `composable(...)` entries [generateNavHost] would wrap in its own `NavHost { }`, but as a
+     * plain builder-scope extension meant to be called inside *someone else's* `NavHost { }`
+     * instead, so this module's screens share one graph/back stack with whoever calls it -
+     * typically an aggregator combining several `BuildMode.Module` modules into one app. No
+     * `startDestination` here: that's meaningless for a fragment of a larger graph, only for
+     * whichever `NavHost` this ends up inside of.
+     */
+    fun generateGraphExtension(
+        functionList: List<KSFunctionDeclaration>,
+        hostName: String,
+        viewModelInjector: ViewModelInjector,
+        defaultAnimation: NavigationAnimation,
+    ): FileSpec {
+        val graphName = "${hostName}Graph"
+        val graphFunction = FunSpec.builder(graphName)
+            .receiver(navGraphBuilderType)
+            .addParameter("navController", navHostControllerType)
+            .addCode(generateScreenComposables(functionList, hostName, viewModelInjector, defaultAnimation))
+            .build()
+
+        return FileSpec.builder(packageName, graphName)
+            .addImport("androidx.navigation", "NavType")
+            .addImport("androidx.navigation", "navArgument")
+            .addImport("com.google.gson", "Gson")
+            .addFunction(graphFunction)
+            .build()
+    }
+
     /** Source text of the `NavHost(...) { ... }` call - one [addScreenComposable] block per screen. */
     private fun generateNavHostBody(
         functionList: List<KSFunctionDeclaration>,
@@ -95,13 +126,30 @@ internal class NavHostContentGenerator(
             "%M(modifier = modifier, navController = navController, startDestination = startDestination)",
             navHostMember,
         )
-        .apply {
-            functionList.forEach { function ->
-                addScreenComposable(function, hostName, viewModelInjector, defaultAnimation)
-            }
-        }
+        .apply { append(functionList, hostName, viewModelInjector, defaultAnimation) }
         .endControlFlow()
         .build()
+
+    /** One [addScreenComposable] block per screen, with no enclosing `NavHost`/graph call - see [generateGraphExtension]. */
+    private fun generateScreenComposables(
+        functionList: List<KSFunctionDeclaration>,
+        hostName: String,
+        viewModelInjector: ViewModelInjector,
+        defaultAnimation: NavigationAnimation,
+    ): CodeBlock = CodeBlock.builder()
+        .apply { append(functionList, hostName, viewModelInjector, defaultAnimation) }
+        .build()
+
+    private fun CodeBlock.Builder.append(
+        functionList: List<KSFunctionDeclaration>,
+        hostName: String,
+        viewModelInjector: ViewModelInjector,
+        defaultAnimation: NavigationAnimation,
+    ) {
+        functionList.forEach { function ->
+            addScreenComposable(function, hostName, viewModelInjector, defaultAnimation)
+        }
+    }
 
     /**
      * Appends one screen's `composable(route = ..., arguments = ..., deepLinks = ...) { ... }`
@@ -220,6 +268,16 @@ internal class NavHostContentGenerator(
         }
     }.build()
 }
+
+/**
+ * The one function in [this] flagged `@KoGenScreen(startDestination = true)`, or `null` if none
+ * is - unlike [generateNavHost]'s own `startDestination` default, which always falls back to the
+ * first screen, this has no such fallback: it's used to report a module's *own* preference to a
+ * manifest, and "nothing preferred" is a real, valid answer there (an aggregator combining
+ * several modules picks its overall start destination from whoever did express one, deterministically).
+ */
+fun List<KSFunctionDeclaration>.findPreferredStartDestination(): KSFunctionDeclaration? =
+    firstOrNull { it.booleanAnnotationParameterByName(KoGenScreen::class, "startDestination") }
 
 /** This screen's own `animation`, or [defaultAnimation] if it left it unset ([NavigationAnimation.None]). */
 fun KSFunctionDeclaration.getAnimationType(defaultAnimation: NavigationAnimation): NavigationAnimation {

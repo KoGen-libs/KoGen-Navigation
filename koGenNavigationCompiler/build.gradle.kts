@@ -24,11 +24,14 @@ dependencies {
     implementation(project(":koGenNavigationCommon"))
     implementation(libs.kotlinpoet)
     implementation(libs.kotlinpoet.ksp)
+    // Serializes/deserializes ModuleManifest (buildMode = module/aggregator) - this is the
+    // compiler's own internal use, unrelated to the Gson the *generated* code references for
+    // untyped route arguments (see ArgumentTypes/RoutesListGenerator).
+    implementation(libs.gson)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
-    testImplementation(libs.gson)
     testImplementation(libs.kotlin.compile.testing)
     testImplementation(libs.kotlin.compile.testing.ksp)
 

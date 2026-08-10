@@ -1,8 +1,10 @@
 package kz.evko.navigation.gradle
 
+import kz.evko.navigation.helpers.BuildMode
 import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjectorKind
 import org.gradle.api.provider.Property
+import org.gradle.api.provider.SetProperty
 
 /**
  * `koGenNavigation { }` - typed configuration for the KoGen Navigation KSP compiler, registered
@@ -35,4 +37,49 @@ abstract class KoGenNavigationExtension {
      * [ViewModelInjectorKind.None] (no injector call generated) if left unset.
      */
     abstract val viewModelInjector: Property<ViewModelInjectorKind>
+
+    /**
+     * Whether this module builds a self-contained app ([BuildMode.Single], the default), a
+     * feature module meant to be combined by an aggregator ([BuildMode.Module]), or the module
+     * that combines them ([BuildMode.Aggregator]). [Module] and [Aggregator] additionally activate
+     * the Gradle-side wiring below - see each property's own doc comment.
+     */
+    abstract val buildMode: Property<BuildMode>
+
+    /**
+     * This module's own name, reported in an aggregator's error messages and used as its
+     * manifest's file name, in [BuildMode.Module]. Defaults to the Gradle project's own name
+     * (`project.name`) - overriding it is only useful if that's ambiguous or you'd rather it read
+     * differently in error messages.
+     */
+    abstract val moduleName: Property<String>
+
+    /**
+     * Which of this module's own build variants' KSP output becomes the manifest published to an
+     * aggregator, in [BuildMode.Module] - e.g. `"debug"` reads from the `kspDebugKotlin` task's
+     * output. Defaults to `"debug"`. Only meaningful for an Android module with build variants;
+     * ignored for a plain Kotlin/JVM one (which has no variants to pick between in the first
+     * place).
+     *
+     * Deliberately variant-*independent* otherwise: a screen's existence/route doesn't usually
+     * differ between debug and release, so publishing one variant's manifest for every consumer
+     * to read - rather than matching the aggregator's own current variant exactly - is a
+     * reasonable simplification, not a real limitation in practice.
+     */
+    abstract val manifestVariant: Property<String>
+
+    /**
+     * The combined `NavHost` function/file's name, in [BuildMode.Aggregator]. Defaults to
+     * `"AppNavHost"`.
+     */
+    abstract val aggregateHostName: Property<String>
+
+    /**
+     * Every [BuildMode.Module] module to combine, as Gradle project paths (e.g. `":feature-login"`)
+     * - required, and only meaningful, in [BuildMode.Aggregator]. Explicit on purpose rather than
+     * auto-discovered from this module's whole dependency graph: safer and clearer than guessing
+     * which of an arbitrary set of dependencies are actually `@KoGenScreen`-bearing feature
+     * modules versus, say, a plain data/networking module that happens to also be a dependency.
+     */
+    abstract val featureModules: SetProperty<String>
 }

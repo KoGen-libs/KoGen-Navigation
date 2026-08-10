@@ -46,22 +46,10 @@ internal class ScreenListGenerator(
             )
 
         functionList.forEach { function ->
-            val params = function.parameters.filter { parameter ->
-                !parameter.isViewModel() && !parameter.isNavHostController()
-            }
-            val screenName = function.toString().replaceScreenWord(screenSuffix)
-            val route = if (params.isEmpty()) {
-                screenName.lowercase()
-            } else {
-                params.joinToString(separator = "&", prefix = "${screenName.lowercase()}?") { param ->
-                    "$param={$param}"
-                }
-            }
-
             enumBuilder.addEnumConstant(
-                screenName,
+                function.toString().replaceScreenWord(screenSuffix),
                 TypeSpec.anonymousClassBuilder()
-                    .addSuperclassConstructorParameter("%S", route)
+                    .addSuperclassConstructorParameter("%S", function.toRoutePattern(screenSuffix))
                     .build(),
             )
         }
@@ -69,5 +57,24 @@ internal class ScreenListGenerator(
         return FileSpec.builder(packageName, className)
             .addType(enumBuilder.build())
             .build()
+    }
+}
+
+/**
+ * The route pattern this screen registers under and is looked up by - lowercase screen name,
+ * with `?param={param}&...` appended for each route parameter (none of it interpolated - this is
+ * the pattern `composable(route = ...)` is registered with, not an actual navigable route; see
+ * `RoutesListGenerator`'s `ActionTo<Screen>` for the string that fills placeholders in with real
+ * values).
+ */
+fun KSFunctionDeclaration.toRoutePattern(screenSuffix: String?): String {
+    val screenName = toString().replaceScreenWord(screenSuffix)
+    val params = parameters.filter { !it.isViewModel() && !it.isNavHostController() }
+    return if (params.isEmpty()) {
+        screenName.lowercase()
+    } else {
+        params.joinToString(separator = "&", prefix = "${screenName.lowercase()}?") { param ->
+            "$param={$param}"
+        }
     }
 }
