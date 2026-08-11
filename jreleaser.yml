@@ -25,6 +25,7 @@ deploy:
           - 'koGenNavigationCommon/build/staging-deploy'
           - 'koGenNavigation/build/staging-deploy'
           - 'koGenNavigationCompiler/build/staging-deploy'
+          - 'koGenNavigationGradlePlugin/build/staging-deploy'
         url: 'https://central.sonatype.com/api/v1/publisher'
         namespace: 'io.github.eugenprog'
         # PomChecker (внутренняя проверка JReleaser) не понимает packaging=aar
