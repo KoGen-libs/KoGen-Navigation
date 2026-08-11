@@ -104,6 +104,59 @@ ksp {
 * `viewModelInjector` (опциональный) — для автоматической подстановки ViewModel. Возможные значения: `koin`, `hilt`.
 * `screenSuffix` (опциональный) — суффикс, который нужно отрезать от имени экрана при формировании имени route/enum-константы/action-класса (например, `"HomeScreen"` -> `"Home"` при `screenSuffix = "Screen"`). Регистронезависимо, отрезается только *последнее* вхождение (`"ScreenshotScreen"` -> `"Screenshot"`, а не `"hot"`). По умолчанию не задан — ничего не отрезается, пока не сконфигурировано явно.
 
+### Через version catalog (опционально)
+
+Всё выше — с обычными строковыми литералами, для наглядности. Если в вашем проекте плагины/зависимости уже объявляются через Gradle version catalog (`gradle/libs.versions.toml`) — сейчас это рекомендуемый способ — вот эквивалент:
+
+```toml
+[versions]
+ksp = "2.1.0-1.0.29" # держите синхронно с версией Kotlin - см. Шаг 1 выше
+kogenNavigation = "<версия>"
+androidxNavigation = "2.7.7"
+
+[libraries]
+androidx-navigation = { group = "androidx.navigation", name = "navigation-compose", version.ref = "androidxNavigation" }
+kogen-navigation-runtime = { group = "io.github.eugenprog", name = "navigation-compose", version.ref = "kogenNavigation" }
+kogen-navigation-compiler = { group = "io.github.eugenprog", name = "navigation-compose-compiler", version.ref = "kogenNavigation" }
+
+[plugins]
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+kogen-navigation = { id = "io.github.eugenprog.kogen-navigation", version.ref = "kogenNavigation" }
+```
+
+```kotlin
+// build.gradle.kts корневого проекта
+plugins {
+    alias(libs.plugins.ksp) apply false
+}
+```
+
+```kotlin
+// build.gradle.kts модуля - Вариант A, Gradle-плагин
+plugins {
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.kogen.navigation)
+}
+
+dependencies {
+    implementation(libs.androidx.navigation)
+    // рантайм/компилятор указывать не нужно - плагин добавит их сам, как и со строками
+}
+```
+
+```kotlin
+// build.gradle.kts модуля - Вариант B, сырой ksp-блок
+plugins {
+    alias(libs.plugins.ksp)
+}
+
+dependencies {
+    implementation(libs.androidx.navigation)
+    implementation(libs.kogen.navigation.runtime)
+    ksp(libs.kogen.navigation.compiler)
+}
+```
+
 ---
 
 ## ⚙️ Основное Использование
