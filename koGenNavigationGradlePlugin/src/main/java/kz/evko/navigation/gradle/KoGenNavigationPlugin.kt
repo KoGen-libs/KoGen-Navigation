@@ -112,9 +112,27 @@ class KoGenNavigationPlugin : Plugin<Project> {
 
         val variant = extension.manifestVariant.get()
         val variantTaskName = "ksp${variant.replaceFirstChar { char -> char.uppercase() }}Kotlin"
-        val hasVariants = project.tasks.findByName(variantTaskName) != null
-        val kspTaskName = if (hasVariants) variantTaskName else "kspKotlin"
-        val resourcesVariantDir = if (hasVariants) variant else "main"
+        // Found by actually adding a product flavor to a real Android module and checking: with
+        // flavors, there is no plain "kspDebugKotlin" *or* "kspKotlin" at all - the real task is
+        // "kspFreeDebugKotlin"/"kspPaidDebugKotlin"/etc. The old fallback (silently trying
+        // "kspKotlin" whenever the exact variant name wasn't found) would throw a raw, confusing
+        // UnknownTaskException in that case - a flavored module needs manifestVariant set
+        // explicitly, and should be told so clearly, with the actual options.
+        val kspTaskName = when {
+            project.tasks.findByName(variantTaskName) != null -> variantTaskName
+            project.tasks.findByName("kspKotlin") != null -> "kspKotlin" // plain Kotlin/JVM module - no variants at all
+            else -> {
+                val available = project.tasks.names.filter { it.startsWith("ksp") && it.endsWith("Kotlin") }.sorted()
+                throw GradleException(
+                    "koGenNavigation: buildMode = \"module\" couldn't find a KSP task named " +
+                        "\"$variantTaskName\" (nor the plain \"kspKotlin\"). This usually means this " +
+                        "module has product flavors, so its real KSP task names differ - set " +
+                        "manifestVariant explicitly to one of: " +
+                        available.ifEmpty { listOf("<none - is the KSP plugin actually applied here?>") },
+                )
+            }
+        }
+        val resourcesVariantDir = if (kspTaskName == variantTaskName) variant else "main"
 
         val manifestFile = project.layout.buildDirectory.file(
             "generated/ksp/$resourcesVariantDir/resources/META-INF/kogen-navigation/${extension.moduleName.get()}.json",
