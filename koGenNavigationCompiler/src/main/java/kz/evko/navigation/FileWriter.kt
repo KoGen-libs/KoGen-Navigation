@@ -6,13 +6,23 @@ import com.google.devtools.ksp.processing.KSPLogger
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSFile
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
+import com.google.gson.Gson
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.ksp.writeTo
+import kz.evko.navigation.contentGenerators.AggregatorContentGenerator
 import kz.evko.navigation.contentGenerators.NavHostContentGenerator
 import kz.evko.navigation.contentGenerators.RoutesListGenerator
 import kz.evko.navigation.contentGenerators.ScreenListGenerator
+import kz.evko.navigation.contentGenerators.findPreferredStartDestination
+import kz.evko.navigation.contentGenerators.toRoutePattern
+import kz.evko.navigation.helpers.BuildMode
 import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjector
+import kz.evko.navigation.manifest.GraphManifestEntry
+import kz.evko.navigation.manifest.ManifestValidator
+import kz.evko.navigation.manifest.ModuleManifest
+import kz.evko.navigation.manifest.ScreenManifestEntry
+import java.io.File
 import kotlin.reflect.KClass
 
 /**
@@ -41,15 +51,24 @@ internal class FileWriter(
         }
     }
 
-    /** Writes `<name>NavigationScreens.kt` for one `navHostName` group, then its `NavHost` via [createNavHost]. No-ops for an empty group. */
+    /**
+     * Writes `<name>NavigationScreens.kt` for one `navHostName` group, then its graph via
+     * [createGraph]. No-ops for an empty group.
+     *
+     * @return This group's [GraphManifestEntry] - for [createManifest] to report, in
+     *   [BuildMode.Module], or for [createAggregatedNavHost] to call directly alongside every
+     *   other module's, in [BuildMode.Aggregator]. `null` for [BuildMode.Single] (which has no use
+     *   for one) or an empty group.
+     */
     fun createScreensList(
         screensFunctions: List<KSFunctionDeclaration>,
         name: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
         screenSuffix: String?,
-    ) {
-        if (!screensFunctions.iterator().hasNext()) return
+        buildMode: BuildMode,
+    ): GraphManifestEntry? {
+        if (!screensFunctions.iterator().hasNext()) return null
 
         val fileName = "${name}NavigationScreens"
         val screenListContentGenerator = ScreenListGenerator(packageName, screenSuffix)
@@ -60,30 +79,80 @@ internal class FileWriter(
         )
         fileSpec.writeToGenerated(screensFunctions)
 
-        createNavHost(
+        return createGraph(
             screensFunctions = screensFunctions,
             name = name,
             viewModelInjector = viewModelInjector,
             defaultAnimation = defaultAnimation,
             screenSuffix = screenSuffix,
+            buildMode = buildMode,
         )
     }
 
-    /** Writes `<name>.kt`, the `@Composable fun <name>(...)` `NavHost` for this group of screens. */
-    private fun createNavHost(
-        screensFunctions: List<KSFunctionDeclaration>, name: String,
+    /**
+     * Writes this group's graph: `<name>.kt` (a self-contained `NavHost`) for [BuildMode.Single],
+     * or `<name>Graph.kt` (a `NavGraphBuilder` extension - see
+     * [NavHostContentGenerator.generateGraphExtension]) for [BuildMode.Module]/[BuildMode.Aggregator]
+     * - an aggregator's own local screens (if it has any) need to end up callable from *its own*
+     * combined `NavHost` exactly the same way every other module's do, not a second, rival
+     * self-contained one under the same default name.
+     */
+    private fun createGraph(
+        screensFunctions: List<KSFunctionDeclaration>,
+        name: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
         screenSuffix: String?,
-    ) {
+        buildMode: BuildMode,
+    ): GraphManifestEntry? {
         val navHostContentGenerator = NavHostContentGenerator(packageName, screenSuffix, logger)
-        val fileSpec = navHostContentGenerator.generateNavHost(
+
+        if (buildMode == BuildMode.Single) {
+            navHostContentGenerator.generateNavHost(
+                functionList = screensFunctions.toList(),
+                hostName = name,
+                viewModelInjector = viewModelInjector,
+                defaultAnimation = defaultAnimation,
+            ).writeToGenerated(screensFunctions)
+            return null
+        }
+
+        navHostContentGenerator.generateGraphExtension(
             functionList = screensFunctions.toList(),
             hostName = name,
             viewModelInjector = viewModelInjector,
             defaultAnimation = defaultAnimation,
+        ).writeToGenerated(screensFunctions)
+
+        val startDestination = screensFunctions.findPreferredStartDestination()
+        return GraphManifestEntry(
+            graphFunctionName = "${name}Graph",
+            screens = screensFunctions.map { function ->
+                ScreenManifestEntry(
+                    route = function.toRoutePattern(screenSuffix),
+                    name = function.toString().replaceScreenWord(screenSuffix),
+                    isStartDestination = function == startDestination,
+                )
+            },
         )
-        fileSpec.writeToGenerated(screensFunctions)
+    }
+
+    /**
+     * Writes `META-INF/kogen-navigation/<moduleName>.json` - a [ModuleManifest] listing every
+     * [BuildMode.Module] `navHostName` group's [GraphManifestEntry] from this KSP run, for an
+     * aggregator elsewhere to pick up. As an ordinary KSP resource (not a Kotlin/Java source
+     * file), so it ends up in this module's normal build output, not compiled - see
+     * `CodeGenerator.createNewFileByPath`.
+     *
+     * No-ops if [graphs] is empty - nothing for an aggregator to read means nothing worth writing.
+     */
+    fun createManifest(moduleName: String, graphs: List<GraphManifestEntry>, screensFunctions: List<KSFunctionDeclaration>) {
+        if (graphs.isEmpty()) return
+
+        val manifest = ModuleManifest(module = moduleName, packageName = packageName, graphs = graphs)
+        val dependencies = Dependencies(true, *screensFunctions.toFileList().toTypedArray())
+        codeGenerator.createNewFileByPath(dependencies, "META-INF/kogen-navigation/$moduleName", "json")
+            .writer().use { it.write(Gson().toJson(manifest)) }
     }
 
     /** Writes `NavigationRoutes.kt` - every screen across every `navHostName` group gets an `ActionTo<Screen>`. */
@@ -98,6 +167,61 @@ internal class FileWriter(
         // No screen name to strip a suffix from here - generateExtensions() doesn't use it.
         val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix = null)
         routesContentGenerator.generateExtensions().writeToGenerated(emptyList())
+    }
+
+    /**
+     * Reads every `*.json` manifest directly under [manifestsDirPath] (each written by a
+     * [BuildMode.Module] module's [createManifest] - collected there by Gradle, not by KSP, see
+     * the module's own KDoc for why), combines them with [ownGraphs] (this aggregator's *own*
+     * local screens, if it has any - see [createGraph]), validates the whole set together via
+     * [ManifestValidator], and writes the combined `<hostName>.kt` - one `NavHost` calling every
+     * one of those graph functions, so they all end up sharing one graph/back stack.
+     *
+     * These manifest files live outside the current KSP compilation entirely (an aggregator can't
+     * see the module that wrote one as a live symbol), so - unlike every other generated file -
+     * this one has no [KSFunctionDeclaration] to build a [Dependencies] from; whether a changed
+     * manifest actually triggers a re-run of this KSP task at all is instead the responsibility of
+     * whatever Gradle task assembles [manifestsDirPath] in the first place (registering it as that
+     * task's own input), not something expressible here.
+     */
+    fun createAggregatedNavHost(manifestsDirPath: String, hostName: String, ownGraphs: List<GraphManifestEntry>) {
+        val manifestsDir = File(manifestsDirPath)
+        if (!manifestsDir.isDirectory) {
+            logger.error("buildMode = \"aggregator\": \"$manifestsDirPath\" is not a directory - nothing to aggregate.")
+            return
+        }
+
+        val gson = Gson()
+        // Recursive, not listFiles() - whatever Gradle mechanism assembles manifestsDirPath may
+        // well preserve each source's own relative path (e.g. a Sync task copying a whole
+        // "resources" tree keeps its "META-INF/kogen-navigation/..." prefix intact), not flatten
+        // every *.json straight into this directory's root.
+        val manifests = manifestsDir.walkTopDown().filter { it.isFile && it.extension == "json" }.toList()
+            .mapNotNull { file ->
+                runCatching { gson.fromJson(file.readText(), ModuleManifest::class.java) }
+                    .onFailure { logger.error("buildMode = \"aggregator\": couldn't parse manifest \"${file.name}\": ${it.message}") }
+                    .getOrNull()
+            } + if (ownGraphs.isEmpty()) {
+            emptyList()
+        } else {
+            listOf(ModuleManifest(module = "(this module)", packageName = packageName, graphs = ownGraphs))
+        }
+
+        if (manifests.isEmpty()) {
+            logger.warn(
+                "buildMode = \"aggregator\": no manifests found under \"$manifestsDirPath\" (and no local " +
+                    "screens of its own) - $hostName won't have any screens at all.",
+            )
+        }
+
+        val validator = ManifestValidator(manifests, logger)
+        validator.validateNoDuplicateRoutes()
+
+        AggregatorContentGenerator(packageName).generateAppNavHost(
+            manifests = manifests,
+            hostName = hostName,
+            startDestinationRoute = validator.resolveStartDestinationRoute(),
+        ).writeToGenerated(emptyList())
     }
 
     /**

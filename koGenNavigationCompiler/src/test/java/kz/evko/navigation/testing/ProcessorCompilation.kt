@@ -18,12 +18,17 @@ import kz.evko.navigation.ScreenGeneratorProcessorProvider
  *   detect that.
  * @param generatedFilePaths every generated file's absolute path, undeduplicated - its count for
  *   a given file name is how many times that name was (re)written, possibly to different packages.
+ * @param generatedResources every non-Kotlin resource written via `CodeGenerator.createNewFileByPath`
+ *   (e.g. a `buildMode = "module"` manifest) - its path relative to the KSP resources root (not
+ *   deduplicated by bare file name the way [generatedFiles] is, since these are identified by full
+ *   path, not by package + simple name) mapped to its content.
  */
 data class ProcessorTestResult(
     val exitCode: KotlinCompilation.ExitCode,
     val messages: String,
     val generatedFiles: Map<String, String>,
     val generatedFilePaths: List<String>,
+    val generatedResources: Map<String, String>,
 ) {
     fun generatedFile(name: String): String =
         generatedFiles[name]
@@ -31,6 +36,11 @@ data class ProcessorTestResult(
 
     /** How many times a file named [name] was written, regardless of which package it ended up in. */
     fun countOf(name: String): Int = generatedFilePaths.count { it.endsWith("/$name") }
+
+    /** The resource at [path] (relative to the KSP resources root, e.g. `"META-INF/kogen-navigation/feature-login.json"`). */
+    fun generatedResource(path: String): String =
+        generatedResources[path]
+            ?: error("No resource at '$path' was generated. Generated resources were: ${generatedResources.keys}")
 }
 
 /**
@@ -88,5 +98,15 @@ fun compileScreenSources(
     val generatedFiles = allKtFiles.associate { it.name to it.readText() }
     val generatedFilePaths = allKtFiles.map { it.absolutePath }
 
-    return ProcessorTestResult(result.exitCode, result.messages, generatedFiles, generatedFilePaths)
+    // Mirrors kotlin-compile-testing's own (internal, so not reachable directly from here)
+    // KotlinCompilation.kspResources = kspSourcesDir.resolve("resources") - where
+    // CodeGenerator.createNewFileByPath output (e.g. a buildMode = "module" manifest) lands,
+    // same convention as a real Gradle KSP run's build/generated/ksp/<variant>/resources.
+    val resourcesRoot = compilation.kspSourcesDir.resolve("resources")
+    val generatedResources = resourcesRoot
+        .walkTopDown()
+        .filter { it.isFile }
+        .associate { it.relativeTo(resourcesRoot).path to it.readText() }
+
+    return ProcessorTestResult(result.exitCode, result.messages, generatedFiles, generatedFilePaths, generatedResources)
 }
