@@ -3,6 +3,36 @@
 All notable changes to this project are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- **Typed `koGenNavigation { }` Gradle DSL**, in a new `navigation-compose-gradle-plugin`
+  artifact (`io.github.eugenprog.kogen-navigation`) - replaces the string-based
+  `ksp { arg(...) }` block with real enums (`NavigationAnimation`, the new
+  `ViewModelInjectorKind`), autocomplete, and compile-time-checked config. The plugin also adds
+  the `navigation-compose`/`navigation-compose-compiler` dependencies for you, at a matching
+  version - it does *not* apply `com.google.devtools.ksp` itself (that version is tied to your
+  own Kotlin version, so you still apply it yourself). The old raw `ksp { arg(...) }` block still
+  works unchanged, for anyone who'd rather not add the extra plugin dependency.
+- **Multi-module build support** - a `buildMode` option (`single` by default, matching every
+  existing setup unchanged) alongside two new ones:
+  - `module`, for a feature module meant to be combined into a larger app: instead of a
+    self-contained `NavHost`, generates a `NavGraphBuilder` extension function meant to be called
+    inside *someone else's* `NavHost { }`, so every module's screens end up sharing one
+    graph/back stack. Also writes a small manifest describing that module's own screens.
+  - `aggregator`, for the module that combines them (typically the real Android application
+    module): reads every `module`'s manifest, validates that no two of them registered the same
+    route (a compile error naming both, instead of a confusing runtime crash), picks an overall
+    `startDestination`, and generates one combined `NavHost` calling every module's screens.
+  - The hand-off between modules is a Gradle `Configuration` pair (tagged with a custom
+    `Category` attribute), registered by the Gradle plugin above and gated entirely on
+    `buildMode` - a module not opting into `module`/`aggregator` sees zero extra Gradle wiring at
+    all, the same as before this release.
+- KDoc across the entire public API and KSP compiler, including on the code the compiler itself
+  generates (`navigateSafety`/`popBackSafety`/`getResultData`, and now the `module` mode's own
+  generated functions too) - opening a generated file in your IDE now shows real documentation,
+  not bare, uncommented code.
+
 ## [1.0.1] - 2026-08-07
 
 ### Added
