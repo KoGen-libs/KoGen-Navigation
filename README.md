@@ -260,6 +260,26 @@ Instead of a self-contained `NavHost`, this generates a `NavGraphBuilder` extens
 `NavHost { }` - see the aggregator below. It also writes a small manifest describing this
 module's own screens, for that aggregator to read.
 
+#### `manifestVariant`
+
+KSP runs once per Android build variant (`kspDebugKotlin`, `kspReleaseKotlin`, ...), each with its
+own separate output - so a module could technically have a different manifest per variant, but only
+one can actually be published for the aggregator to consume. `manifestVariant` picks which one;
+it defaults to `"debug"`.
+
+```kotlin
+koGenNavigation {
+    buildMode = BuildMode.Module
+    packageName = "com.myawesome.project.featurelogin"
+    manifestVariant = "debug" // which variant's manifest gets published; defaults to "debug"
+}
+```
+
+If this module has product flavors, there is no plain `kspDebugKotlin` task at all - the real task
+names are flavor-qualified (e.g. `kspFreeDebugKotlin`), so `manifestVariant` must be set explicitly
+to match one of them (e.g. `manifestVariant = "freeDebug"`), or the build fails with a clear error
+listing the real KSP task names available in this module.
+
 ### The module that combines them: `buildMode = "aggregator"`
 
 Typically your real Android application module.
