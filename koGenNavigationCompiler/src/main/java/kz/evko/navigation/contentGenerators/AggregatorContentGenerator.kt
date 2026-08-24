@@ -70,21 +70,25 @@ internal class AggregatorContentGenerator(
         val fileBuilder = FileSpec.builder(packageName, hostName)
             .addFunction(hostFunction)
         if (tabStartDestinations.isNotEmpty()) {
-            fileBuilder.addFunction(generateNavigateToTabFunction())
+            fileBuilder.addFunction(generateTabNavigateSafetyOverload())
             tabStartDestinations.keys.forEach { tabGraph -> fileBuilder.addType(generateTabAction(tabGraph)) }
         }
         return fileBuilder.build()
     }
 
     /**
-     * `fun NavHostController.navigateToTab(action: TabNavigationAction)` - one shared function for
-     * every tab (not one per tab - the recipe itself never varies, only [TabNavigationAction.route]
-     * does), applying Google's recommended tab-switch recipe (`popUpTo` the graph's own start with
-     * `saveState`, `launchSingleTop`, `restoreState`) so a tab bar's `onClick` doesn't need to
-     * spell it out by hand, or duplicate it, for every tab.
+     * `fun NavHostController.navigateSafety(action: TabNavigationAction)` - overloads the same
+     * name a screen's own `navigateSafety(action: NavigationAction, ...)` uses (see
+     * `RoutesListGenerator.generateExtensions`), so there's one call to remember regardless of
+     * what's being navigated to - Kotlin picks the right overload from [TabNavigationAction] vs
+     * `NavigationAction` being unrelated types, the same way it always resolves an overload by
+     * argument type. One shared function for every tab (not one per tab - the recipe itself never
+     * varies, only [TabNavigationAction.route] does), applying Google's recommended tab-switch
+     * recipe (`popUpTo` the graph's own start with `saveState`, `launchSingleTop`, `restoreState`)
+     * so a tab bar's `onClick` doesn't need to spell it out by hand, or duplicate it, for every tab.
      */
-    private fun generateNavigateToTabFunction(): FunSpec =
-        FunSpec.builder("navigateToTab")
+    private fun generateTabNavigateSafetyOverload(): FunSpec =
+        FunSpec.builder("navigateSafety")
             .receiver(navHostControllerType)
             .addKdoc("Switches to [action]'s tab, preserving its own back stack/scroll position.")
             .addParameter("action", tabNavigationActionType)
@@ -101,7 +105,7 @@ internal class AggregatorContentGenerator(
             )
             .build()
 
-    /** `data object ActionTo<Graph> : TabNavigationAction(route = tabGraph)` - a typed reference to pass [generateNavigateToTabFunction] its own `navigateToTab`. */
+    /** `data object ActionTo<Graph> : TabNavigationAction(route = tabGraph)` - a typed reference to pass [generateTabNavigateSafetyOverload]'s own `navigateSafety` overload. */
     private fun generateTabAction(tabGraph: String): TypeSpec =
         TypeSpec.objectBuilder("ActionTo" + tabGraph.replaceFirstChar { it.uppercase() })
             .addModifiers(KModifier.DATA)

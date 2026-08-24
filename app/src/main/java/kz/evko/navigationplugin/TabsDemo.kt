@@ -16,13 +16,13 @@ import kz.evko.navigation.annotation.KoGenTab
 import kz.evko.navigation.navigation.ActionToHomeTab
 import kz.evko.navigation.navigation.ActionToProfileTab
 import kz.evko.navigation.navigation.AppTabsHost
-import kz.evko.navigation.navigation.navigateToTab
+import kz.evko.navigation.navigation.navigateSafety
 
 // Two single-screen tabs, BuildMode.Single (this module sets no buildMode - the compiler default)
 // - @KoGenTab alone, no @KoGenScreen: verifies a tab screen needs no second annotation, and nests
 // its group into one shared NavHost even with no aggregator/module split at all, combined into the
 // generated AppTabsHost below (tabsHostName's own default) along with a generated, typed
-// ActionToHomeTab/ActionToProfileTab for the tab bar below to pass to the one shared navigateToTab.
+// ActionToHomeTab/ActionToProfileTab for the tab bar below to pass to the shared navigateSafety overload.
 @KoGenTab(graph = "homeTab", startDestination = true)
 @Composable
 fun HomeScreen() {
@@ -35,7 +35,7 @@ fun ProfileScreen() {
     Text("Profile tab")
 }
 
-/** A real bottom nav bar driving the generated `AppTabsHost` via the generated `navigateToTab`. */
+/** A real bottom nav bar driving the generated `AppTabsHost` via the generated `navigateSafety` overload. */
 @Composable
 fun TabsDemo() {
     val navController = rememberNavController()
@@ -46,13 +46,13 @@ fun TabsDemo() {
             NavigationBar {
                 NavigationBarItem(
                     selected = currentDestination?.hierarchy?.any { it.route == "homeTab" } == true,
-                    onClick = { navController.navigateToTab(ActionToHomeTab) },
+                    onClick = { navController.navigateSafety(ActionToHomeTab) },
                     icon = {},
                     label = { Text("Home") },
                 )
                 NavigationBarItem(
                     selected = currentDestination?.hierarchy?.any { it.route == "profileTab" } == true,
-                    onClick = { navController.navigateToTab(ActionToProfileTab) },
+                    onClick = { navController.navigateSafety(ActionToProfileTab) },
                     icon = {},
                     label = { Text("Profile") },
                 )

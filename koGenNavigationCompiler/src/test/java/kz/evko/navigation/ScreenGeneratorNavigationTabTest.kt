@@ -19,7 +19,7 @@ import java.nio.file.Path
  * sharing a [KoGenTab.graph] is nested inside a `navigation(route = graph, startDestination = ...) { }`
  * block in one shared `NavHost`; every tab also gets a generated, typed `ActionTo<Graph>` (a
  * `TabNavigationAction`, deliberately unrelated to a screen's own `NavigationAction`) to pass to
- * one shared `navigateToTab(action)` tab-switch helper.
+ * one shared `navigateSafety(action)` tab-switch overload.
  *
  * Covers all three build modes, the `shareTabGraph` local-vs-aggregator split, the "never crash,
  * first wins, warn" conflict policy, and - the one a stacked-annotation design got wrong - that the
@@ -106,7 +106,7 @@ class ScreenGeneratorNavigationTabTest {
     // region BuildMode.Single
 
     @Test
-    fun `single mode nests a tab into a generated navigateTo function, leaving a plain group untouched`() {
+    fun `single mode nests a tab into a generated navigateSafety overload, leaving a plain group untouched`() {
         val result = compileScreens(homeTabSource)
 
         assertEquals(ExitCode.OK, result.exitCode, result.messages)
@@ -126,7 +126,7 @@ class ScreenGeneratorNavigationTabTest {
         assertFalse(appTabsHost.contains("SettingsScreen"), appTabsHost)
 
         // One shared function, not one per tab - and a typed ActionTo<Graph>, not a raw string.
-        assertTrue(appTabsHost.contains("fun NavHostController.navigateToTab(action: TabNavigationAction)"), appTabsHost)
+        assertTrue(appTabsHost.contains("fun NavHostController.navigateSafety(action: TabNavigationAction)"), appTabsHost)
         assertTrue(appTabsHost.contains("navigate(action.route)"), appTabsHost)
         assertTrue(appTabsHost.contains("popUpTo(graph.findStartDestination().id)"), appTabsHost)
         assertTrue(appTabsHost.contains("saveState = true"), appTabsHost)
@@ -157,7 +157,7 @@ class ScreenGeneratorNavigationTabTest {
     }
 
     @Test
-    fun `single mode combines more than one tab into the same host, sharing one navigateToTab function`() {
+    fun `single mode combines more than one tab into the same host, sharing one navigateSafety overload`() {
         val result = compileScreens(
             """
             package test.app.screens
@@ -182,7 +182,7 @@ class ScreenGeneratorNavigationTabTest {
         assertTrue(appTabsHost.contains("navigation(startDestination = \"home\", route = \"homeTab\")"), appTabsHost)
         assertTrue(appTabsHost.contains("navigation(startDestination = \"profile\", route = \"profileTab\")"), appTabsHost)
         // One shared function for both tabs - not one per tab.
-        assertEquals(1, appTabsHost.split("fun NavHostController.navigateToTab(").size - 1, appTabsHost)
+        assertEquals(1, appTabsHost.split("fun NavHostController.navigateSafety(").size - 1, appTabsHost)
         assertTrue(appTabsHost.contains("data object ActionToHomeTab : TabNavigationAction(route = \"homeTab\")"), appTabsHost)
         assertTrue(appTabsHost.contains("data object ActionToProfileTab : TabNavigationAction(route = \"profileTab\")"), appTabsHost)
     }
@@ -311,7 +311,7 @@ class ScreenGeneratorNavigationTabTest {
 
         val appTabsHost = result.generatedFile("AppTabsHost.kt")
         assertTrue(appTabsHost.contains("navigation(startDestination = \"home\", route = \"homeTab\")"), appTabsHost)
-        assertTrue(appTabsHost.contains("fun NavHostController.navigateToTab(action: TabNavigationAction)"), appTabsHost)
+        assertTrue(appTabsHost.contains("fun NavHostController.navigateSafety(action: TabNavigationAction)"), appTabsHost)
         assertTrue(appTabsHost.contains("data object ActionToHomeTab : TabNavigationAction(route = \"homeTab\")"), appTabsHost)
 
         val manifest = result.generatedResource("META-INF/kogen-navigation/feature-home.json")
@@ -388,7 +388,7 @@ class ScreenGeneratorNavigationTabTest {
         assertTrue(appNavHost.contains("navigation(startDestination = \"home\", route = \"homeTab\")"), appNavHost)
         assertTrue(appNavHost.contains("homeTabGraph(navController)"), appNavHost)
         assertTrue(appNavHost.contains("homeSettingsGraph(navController)"), appNavHost)
-        assertTrue(appNavHost.contains("fun NavHostController.navigateToTab(action: TabNavigationAction)"), appNavHost)
+        assertTrue(appNavHost.contains("fun NavHostController.navigateSafety(action: TabNavigationAction)"), appNavHost)
         assertTrue(appNavHost.contains("data object ActionToHomeTab : TabNavigationAction(route = \"homeTab\")"), appNavHost)
         // The outer default is the tab's own route, not the screen's - even across modules.
         assertTrue(appNavHost.contains("startDestination: String = \"homeTab\""), appNavHost)
