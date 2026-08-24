@@ -4,9 +4,11 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.STRING
+import com.squareup.kotlinpoet.TypeSpec
 import kz.evko.navigation.manifest.GraphManifestEntry
 import kz.evko.navigation.manifest.ModuleManifest
 
@@ -34,6 +36,7 @@ internal class AggregatorContentGenerator(
     // inside it fails as "private in NavOptionsBuilder" instead of the actually-missing-symbol
     // error you'd expect.
     private val findStartDestinationMember = MemberName(ClassName("androidx.navigation", "NavGraph", "Companion"), "findStartDestination")
+    private val tabNavigationActionType = ClassName("kz.evko.navigation.routes", "TabNavigationAction")
 
     /** One manifest's [GraphManifestEntry], plus that manifest's own package (to qualify [GraphManifestEntry.graphFunctionName] with). */
     private data class Entry(val packageName: String, val graph: GraphManifestEntry)
@@ -66,23 +69,28 @@ internal class AggregatorContentGenerator(
 
         val fileBuilder = FileSpec.builder(packageName, hostName)
             .addFunction(hostFunction)
-        tabStartDestinations.keys.forEach { tabGraph -> fileBuilder.addFunction(generateNavigateToTabFunction(tabGraph)) }
+        if (tabStartDestinations.isNotEmpty()) {
+            fileBuilder.addFunction(generateNavigateToTabFunction())
+            tabStartDestinations.keys.forEach { tabGraph -> fileBuilder.addType(generateTabAction(tabGraph)) }
+        }
         return fileBuilder.build()
     }
 
     /**
-     * `fun NavHostController.navigateTo<Tab>()` - applies Google's recommended tab-switch recipe
-     * (`popUpTo` the graph's own start with `saveState`, `launchSingleTop`, `restoreState`) so a
-     * tab bar's `onClick` doesn't need to spell it out by hand for every tab.
+     * `fun NavHostController.navigateToTab(action: TabNavigationAction)` - one shared function for
+     * every tab (not one per tab - the recipe itself never varies, only [TabNavigationAction.route]
+     * does), applying Google's recommended tab-switch recipe (`popUpTo` the graph's own start with
+     * `saveState`, `launchSingleTop`, `restoreState`) so a tab bar's `onClick` doesn't need to
+     * spell it out by hand, or duplicate it, for every tab.
      */
-    private fun generateNavigateToTabFunction(tabGraph: String): FunSpec {
-        val functionName = "navigateTo" + tabGraph.replaceFirstChar { it.uppercase() }
-        return FunSpec.builder(functionName)
+    private fun generateNavigateToTabFunction(): FunSpec =
+        FunSpec.builder("navigateToTab")
             .receiver(navHostControllerType)
-            .addKdoc("Switches to the %S tab, preserving its own back stack/scroll position.", tabGraph)
+            .addKdoc("Switches to [action]'s tab, preserving its own back stack/scroll position.")
+            .addParameter("action", tabNavigationActionType)
             .addCode(
                 CodeBlock.builder()
-                    .beginControlFlow("navigate(%S)", tabGraph)
+                    .beginControlFlow("navigate(action.route)")
                     .beginControlFlow("popUpTo(graph.%M().id)", findStartDestinationMember)
                     .addStatement("saveState = true")
                     .endControlFlow()
@@ -92,7 +100,14 @@ internal class AggregatorContentGenerator(
                     .build(),
             )
             .build()
-    }
+
+    /** `data object ActionTo<Graph> : TabNavigationAction(route = tabGraph)` - a typed reference to pass [generateNavigateToTabFunction] its own `navigateToTab`. */
+    private fun generateTabAction(tabGraph: String): TypeSpec =
+        TypeSpec.objectBuilder("ActionTo" + tabGraph.replaceFirstChar { it.uppercase() })
+            .addModifiers(KModifier.DATA)
+            .superclass(tabNavigationActionType)
+            .addSuperclassConstructorParameter("route = %S", tabGraph)
+            .build()
 
     /**
      * `NavHost(...) { moduleAGraph(navController); navigation(...) { moduleBGraph(navController); ... } }` -

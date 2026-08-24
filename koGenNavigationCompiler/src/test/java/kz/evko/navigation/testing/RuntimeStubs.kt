@@ -40,6 +40,10 @@ internal val runtimeStubSources: List<SourceFile> = listOf(
             fromScreen: String?,
             toScreen: String?,
         ): String = ""
+
+        open class TabNavigationAction(
+            val route: String,
+        )
         """.trimIndent(),
     ),
     SourceFile.kotlin(
