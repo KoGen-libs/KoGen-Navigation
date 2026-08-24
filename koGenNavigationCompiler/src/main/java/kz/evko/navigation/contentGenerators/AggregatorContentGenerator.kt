@@ -25,6 +25,16 @@ internal class AggregatorContentGenerator(
     private val navHostMember = MemberName("androidx.navigation.compose", "NavHost")
     private val navigationMember = MemberName("androidx.navigation.compose", "navigation")
 
+    // findStartDestination() lives in NavGraph's own companion, not as a plain top-level function
+    // in the package - importing it as if it were (the natural-looking MemberName("androidx.navigation",
+    // "findStartDestination")) silently resolves to nothing, and the knock-on type-inference
+    // failure was confusing enough to be worth this comment: `popUpTo(...)`'s argument becomes an
+    // error type, which somehow still type-checks the call but resolves its trailing lambda's
+    // implicit receiver to the *outer* NavOptionsBuilder instead of PopUpToBuilder - so `saveState`
+    // inside it fails as "private in NavOptionsBuilder" instead of the actually-missing-symbol
+    // error you'd expect.
+    private val findStartDestinationMember = MemberName(ClassName("androidx.navigation", "NavGraph", "Companion"), "findStartDestination")
+
     /** One manifest's [GraphManifestEntry], plus that manifest's own package (to qualify [GraphManifestEntry.graphFunctionName] with). */
     private data class Entry(val packageName: String, val graph: GraphManifestEntry)
 
@@ -54,8 +64,33 @@ internal class AggregatorContentGenerator(
             .addCode(generateBody(manifests, tabStartDestinations))
             .build()
 
-        return FileSpec.builder(packageName, hostName)
+        val fileBuilder = FileSpec.builder(packageName, hostName)
             .addFunction(hostFunction)
+        tabStartDestinations.keys.forEach { tabGraph -> fileBuilder.addFunction(generateNavigateToTabFunction(tabGraph)) }
+        return fileBuilder.build()
+    }
+
+    /**
+     * `fun NavHostController.navigateTo<Tab>()` - applies Google's recommended tab-switch recipe
+     * (`popUpTo` the graph's own start with `saveState`, `launchSingleTop`, `restoreState`) so a
+     * tab bar's `onClick` doesn't need to spell it out by hand for every tab.
+     */
+    private fun generateNavigateToTabFunction(tabGraph: String): FunSpec {
+        val functionName = "navigateTo" + tabGraph.replaceFirstChar { it.uppercase() }
+        return FunSpec.builder(functionName)
+            .receiver(navHostControllerType)
+            .addKdoc("Switches to the %S tab, preserving its own back stack/scroll position.", tabGraph)
+            .addCode(
+                CodeBlock.builder()
+                    .beginControlFlow("navigate(%S)", tabGraph)
+                    .beginControlFlow("popUpTo(graph.%M().id)", findStartDestinationMember)
+                    .addStatement("saveState = true")
+                    .endControlFlow()
+                    .addStatement("launchSingleTop = true")
+                    .addStatement("restoreState = true")
+                    .endControlFlow()
+                    .build(),
+            )
             .build()
     }
 

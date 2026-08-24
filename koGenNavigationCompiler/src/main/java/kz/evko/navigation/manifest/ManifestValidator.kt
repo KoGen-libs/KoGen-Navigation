@@ -43,12 +43,26 @@ class ManifestValidator(
             }
     }
 
+    /** One thing eligible to become the outer `NavHost`'s own default `startDestination`. */
+    private data class StartCandidate(
+        val route: String,
+        val isExplicit: Boolean,
+        val module: String,
+    )
+
     /**
-     * The route to default the generated `AppNavHost`'s own `startDestination` parameter to - the
-     * first screen (sorted by module name, then declaration order within it, for a deterministic
-     * result independent of manifest read order) flagged `@KoGenScreen(startDestination = true)`,
-     * or - if literally none was - the very first screen overall in that same order. `null` if
-     * there are no screens at all to pick from.
+     * The route to default the generated `AppNavHost`'s own `startDestination` parameter to.
+     * Candidates are every plain (non-tab) screen's own route, plus every distinct tab's own route
+     * (**never** a route that lives inside one - the outer `NavHost` can only start on something
+     * directly in its own scope, which for a tab means the tab itself, not whichever screen is its
+     * own `startDestination`). A tab counts as "explicit" the same way a screen does: some screen
+     * in it set `startDestination = true` (`@KoGenScreen` for a plain screen, `@KoGenTab` for a
+     * tab's own entry point).
+     *
+     * Picks the first explicit candidate (sorted by module, then declaration order within it, for
+     * a deterministic result independent of manifest read order), or - if literally none was - the
+     * very first candidate overall in that same order. `null` if there's nothing at all to pick
+     * from.
      *
      * More than one module flagging its own preferred start destination is the *normal* case
      * (every module should be able to run/preview standalone), not an error - unlike
@@ -57,24 +71,34 @@ class ManifestValidator(
      */
     fun resolveStartDestinationRoute(): String? {
         val ordered = allScreens.sortedBy { it.module }
-        return ordered.firstOrNull { it.screen.isStartDestination }?.screen?.route
-            ?: ordered.firstOrNull()?.screen?.route
+        val plainCandidates = ordered.filter { it.tabGraph == null }.map {
+            StartCandidate(it.screen.route, it.screen.isStartDestination, it.module)
+        }
+        val tabCandidates = ordered.filter { it.tabGraph != null }
+            .groupBy { it.tabGraph!! }
+            .map { (tabGraph, screens) ->
+                StartCandidate(
+                    route = tabGraph,
+                    isExplicit = screens.any { it.screen.isStartDestination },
+                    module = screens.minOf { it.module },
+                )
+            }
+        val candidates = (plainCandidates + tabCandidates).sortedBy { it.module }
+        return candidates.firstOrNull { it.isExplicit }?.route ?: candidates.firstOrNull()?.route
     }
 
     /**
-     * The route to default each tab graph's own `startDestination` to, keyed by
-     * [kz.evko.navigation.manifest.GraphManifestEntry.tabGraph] - same resolution as
-     * [resolveStartDestinationRoute], just scoped to each tab's own screens instead of the whole
-     * app: the first one (by module, then declaration order) flagged
-     * `@KoGenTab(startDestination = true)`, or - if none in that tab was - its first
-     * screen overall. Every distinct tab name found across [manifests] gets an entry; a tab
-     * necessarily has at least one screen, since it only exists because some screen named it.
+     * The route to default each tab's own `startDestination` to, keyed by
+     * [GraphManifestEntry.tabGraph] - the first screen (by module, then declaration order) flagged
+     * `@KoGenTab(startDestination = true)`, or - if none in that tab was - its first screen
+     * overall. Every distinct tab name found across [manifests] gets an entry; a tab necessarily
+     * has at least one screen, since it only exists because some screen named it.
      */
     fun resolveTabStartDestinations(): Map<String, String> {
         val ordered = allScreens.sortedBy { it.module }
         return ordered.mapNotNull { it.tabGraph }.distinct().associateWith { tabGraph ->
             val screens = ordered.filter { it.tabGraph == tabGraph }
-            screens.firstOrNull { it.screen.isTabStartDestination }?.screen?.route
+            screens.firstOrNull { it.screen.isStartDestination }?.screen?.route
                 ?: screens.first().screen.route
         }
     }

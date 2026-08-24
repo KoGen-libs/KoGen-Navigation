@@ -14,8 +14,6 @@ import kz.evko.navigation.contentGenerators.NavHostContentGenerator
 import kz.evko.navigation.contentGenerators.RoutesListGenerator
 import kz.evko.navigation.contentGenerators.ScreenListGenerator
 import kz.evko.navigation.contentGenerators.findPreferredStartDestination
-import kz.evko.navigation.contentGenerators.findPreferredTabStartDestination
-import kz.evko.navigation.contentGenerators.resolveTabGraphName
 import kz.evko.navigation.contentGenerators.toRoutePattern
 import kz.evko.navigation.helpers.BuildMode
 import kz.evko.navigation.helpers.NavigationAnimation
@@ -54,13 +52,16 @@ internal class FileWriter(
     }
 
     /**
-     * Writes `<name>NavigationScreens.kt` for one `navHostName` group, then its graph via
-     * [createGraph]. No-ops for an empty group.
+     * Writes `<name>NavigationScreens.kt` for one `navHostName`/[KoGenTab.graph] group, then its
+     * graph via [createGraph]. No-ops for an empty group.
      *
+     * @param annotationClass `KoGenScreen::class` for a plain group, `KoGenTab::class` for a tab.
+     * @param isTab Whether this group is a tab (grouped by `@KoGenTab(graph = name)`) rather than a
+     *   plain one (grouped by `@KoGenScreen(navHostName = name)`).
      * @return This group's [GraphManifestEntry] - for [createManifest] to report, in
      *   [BuildMode.Module], or for [createAggregatedNavHost] to call directly alongside every
-     *   other module's, in [BuildMode.Aggregator]. `null` for [BuildMode.Single] (which has no use
-     *   for one) or an empty group.
+     *   other module's, in [BuildMode.Aggregator]. `null` for a plain group in [BuildMode.Single]
+     *   (which has no use for one) or an empty group.
      */
     fun createScreensList(
         screensFunctions: List<KSFunctionDeclaration>,
@@ -69,6 +70,8 @@ internal class FileWriter(
         defaultAnimation: NavigationAnimation,
         screenSuffix: String?,
         buildMode: BuildMode,
+        annotationClass: KClass<*>,
+        isTab: Boolean,
     ): GraphManifestEntry? {
         if (!screensFunctions.iterator().hasNext()) return null
 
@@ -88,23 +91,24 @@ internal class FileWriter(
             defaultAnimation = defaultAnimation,
             screenSuffix = screenSuffix,
             buildMode = buildMode,
+            annotationClass = annotationClass,
+            isTab = isTab,
         )
     }
 
     /**
-     * Writes this group's graph: `<name>.kt` (a self-contained `NavHost`) for a plain (non-tab)
-     * group in [BuildMode.Single], or `<name>Graph.kt` (a `NavGraphBuilder` extension - see
+     * Writes this group's graph: `<name>.kt` (a self-contained `NavHost`) for a plain group in
+     * [BuildMode.Single], or `<name>Graph.kt` (a `NavGraphBuilder` extension - see
      * [NavHostContentGenerator.generateGraphExtension]) otherwise - [BuildMode.Module]/[BuildMode.Aggregator]
      * always (an aggregator's own local screens, if it has any, need to end up callable from *its
      * own* combined `NavHost` exactly the same way every other module's do, not a second, rival
-     * self-contained one under the same default name), and [BuildMode.Single] too as soon as any of
-     * this group's screens name a tab via `@KoGenTab` - a tab is always nested inside a
-     * shared `NavHost` (see [createLocalTabbedNavHost]/`createAggregatedNavHost`), never its own
-     * separate one, regardless of build mode.
+     * self-contained one under the same default name), and any tab group regardless of build mode
+     * - a tab is always nested inside a shared `NavHost` (see [createLocalTabbedNavHost]/
+     * `createAggregatedNavHost`), never its own separate one.
      *
      * @return `null` for a plain group in [BuildMode.Single] (which has no use for a manifest
-     *   entry) or an empty group - a real entry otherwise, [GraphManifestEntry.tabGraph] set
-     *   whenever this group named one.
+     *   entry) or an empty group - a real entry otherwise, [GraphManifestEntry.tabGraph] set to
+     *   [name] when [isTab].
      */
     private fun createGraph(
         screensFunctions: List<KSFunctionDeclaration>,
@@ -113,11 +117,12 @@ internal class FileWriter(
         defaultAnimation: NavigationAnimation,
         screenSuffix: String?,
         buildMode: BuildMode,
+        annotationClass: KClass<*>,
+        isTab: Boolean,
     ): GraphManifestEntry? {
         val navHostContentGenerator = NavHostContentGenerator(packageName, screenSuffix, logger)
-        val tabGraph = screensFunctions.resolveTabGraphName(logger)
 
-        if (buildMode == BuildMode.Single && tabGraph == null) {
+        if (buildMode == BuildMode.Single && !isTab) {
             navHostContentGenerator.generateNavHost(
                 functionList = screensFunctions.toList(),
                 hostName = name,
@@ -132,10 +137,10 @@ internal class FileWriter(
             hostName = name,
             viewModelInjector = viewModelInjector,
             defaultAnimation = defaultAnimation,
+            annotationClass = annotationClass,
         ).writeToGenerated(screensFunctions)
 
-        val startDestination = screensFunctions.findPreferredStartDestination()
-        val tabStartDestination = tabGraph?.let { screensFunctions.findPreferredTabStartDestination(logger) }
+        val startDestination = screensFunctions.findPreferredStartDestination(annotationClass, logger)
         return GraphManifestEntry(
             graphFunctionName = "${name}Graph",
             screens = screensFunctions.map { function ->
@@ -143,10 +148,9 @@ internal class FileWriter(
                     route = function.toRoutePattern(screenSuffix),
                     name = function.toString().replaceScreenWord(screenSuffix),
                     isStartDestination = function == startDestination,
-                    isTabStartDestination = function == tabStartDestination,
                 )
             },
-            tabGraph = tabGraph,
+            tabGraph = if (isTab) name else null,
         )
     }
 
@@ -305,29 +309,6 @@ internal fun KSFunctionDeclaration.booleanAnnotationParameterByName(
     annotationClass: KClass<*>,
     parameterName: String,
 ): Boolean = rawAnnotationParameterValue(annotationClass, parameterName) as? Boolean ?: false
-
-/**
- * Same as [stringAnnotationParameterByName], but for an annotation that might not be present on
- * this function at all (e.g. `@KoGenTab`, unlike `@KoGenScreen` itself - every function
- * these helpers usually run on is already guaranteed to have that one). `null` either way: the
- * annotation isn't there, or it is but [parameterName] isn't a `String`.
- */
-internal fun KSFunctionDeclaration.stringAnnotationParameterByNameOrNull(
-    annotationClass: KClass<*>,
-    parameterName: String,
-): String? {
-    val annotation = annotations.firstOrNull { it.shortName.asString() == annotationClass.simpleName.toString() } ?: return null
-    return annotation.arguments.firstOrNull { it.name?.asString() == parameterName }?.value as? String
-}
-
-/** Same as [stringAnnotationParameterByNameOrNull], for a `Boolean`-typed annotation parameter. */
-internal fun KSFunctionDeclaration.booleanAnnotationParameterByNameOrNull(
-    annotationClass: KClass<*>,
-    parameterName: String,
-): Boolean? {
-    val annotation = annotations.firstOrNull { it.shortName.asString() == annotationClass.simpleName.toString() } ?: return null
-    return annotation.arguments.firstOrNull { it.name?.asString() == parameterName }?.value as? Boolean
-}
 
 /**
  * Same as [stringAnnotationParameterByName], for an `Array<String>`-typed annotation parameter

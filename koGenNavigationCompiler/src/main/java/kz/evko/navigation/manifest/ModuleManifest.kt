@@ -8,9 +8,13 @@ package kz.evko.navigation.manifest
 data class ScreenManifestEntry(
     val route: String,
     val name: String,
+    /**
+     * Whether this screen is its own group's `startDestination` - for a plain group
+     * ([GraphManifestEntry.tabGraph] `null`), that group's own preferred app-wide default; for a
+     * tab group, that tab's own entry point instead (see `@KoGenTab`) - which of the two a given
+     * [GraphManifestEntry] means is entirely determined by whether it set [GraphManifestEntry.tabGraph].
+     */
     val isStartDestination: Boolean,
-    /** Whether this screen is its [GraphManifestEntry.tabGraph]'s own `startDestination` - see `@KoGenTab`. */
-    val isTabStartDestination: Boolean = false,
 )
 
 /**

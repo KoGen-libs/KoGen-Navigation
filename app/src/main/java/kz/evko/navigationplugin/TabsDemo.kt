@@ -10,31 +10,31 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
-import kz.evko.navigation.annotation.KoGenScreen
 import kz.evko.navigation.annotation.KoGenTab
 import kz.evko.navigation.navigation.AppTabsHost
+import kz.evko.navigation.navigation.navigateToHomeTab
+import kz.evko.navigation.navigation.navigateToProfileTab
 
 // Two single-screen tabs, BuildMode.Single (this module sets no buildMode - the compiler default)
-// - verifies @KoGenTab nests a group into one shared NavHost even with no aggregator/module split
-// at all, combined into the generated AppTabsHost below (tabsHostName's own default).
-@KoGenScreen(navHostName = "homeTabHost", startDestination = true)
+// - @KoGenTab alone, no @KoGenScreen: verifies a tab screen needs no second annotation, and nests
+// its group into one shared NavHost even with no aggregator/module split at all, combined into the
+// generated AppTabsHost below (tabsHostName's own default) along with a generated
+// navigateToHomeTab()/navigateToProfileTab() for the tab bar below to call.
 @KoGenTab(graph = "homeTab", startDestination = true)
 @Composable
 fun HomeTabScreen() {
     Text("Home tab")
 }
 
-@KoGenScreen(navHostName = "profileTabHost", startDestination = true)
 @KoGenTab(graph = "profileTab", startDestination = true)
 @Composable
 fun ProfileTabScreen() {
     Text("Profile tab")
 }
 
-/** A real bottom nav bar driving the generated `AppTabsHost`, Google's own recommended pattern. */
+/** A real bottom nav bar driving the generated `AppTabsHost` via the generated `navigateTo*` functions. */
 @Composable
 fun TabsDemo() {
     val navController = rememberNavController()
@@ -43,22 +43,18 @@ fun TabsDemo() {
         bottomBar = {
             val currentDestination = navController.currentBackStackEntryAsState().value?.destination
             NavigationBar {
-                listOf("homeTab" to "Home", "profileTab" to "Profile").forEach { (route, label) ->
-                    NavigationBarItem(
-                        selected = currentDestination?.hierarchy?.any { it.route == route } == true,
-                        onClick = {
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.findStartDestination().id) {
-                                    saveState = true
-                                }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                        icon = {},
-                        label = { Text(label) },
-                    )
-                }
+                NavigationBarItem(
+                    selected = currentDestination?.hierarchy?.any { it.route == "homeTab" } == true,
+                    onClick = { navController.navigateToHomeTab() },
+                    icon = {},
+                    label = { Text("Home") },
+                )
+                NavigationBarItem(
+                    selected = currentDestination?.hierarchy?.any { it.route == "profileTab" } == true,
+                    onClick = { navController.navigateToProfileTab() },
+                    icon = {},
+                    label = { Text("Profile") },
+                )
             }
         },
     ) { innerPadding ->

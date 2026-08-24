@@ -9,6 +9,7 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.validate
 import kz.evko.navigation.annotation.KoGenScreen
+import kz.evko.navigation.annotation.KoGenTab
 import kz.evko.navigation.helpers.BuildMode
 import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjector
@@ -24,9 +25,10 @@ class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {
 }
 
 /**
- * Finds every `@KoGenScreen`-annotated function, groups them by `navHostName`, and hands each
- * group to [fileGenerator] to turn into a screens enum + `NavHost` - plus, project-wide, the
- * routes/extensions files.
+ * Finds every `@KoGenScreen`-annotated function (grouped by `navHostName`, into a plain graph) and
+ * every `@KoGenTab`-annotated one (grouped by `graph`, into a tab - see its own doc for why a
+ * screen carries exactly one of the two, never both), and hands each group to [fileGenerator] to
+ * turn into a screens enum + graph - plus, project-wide, the routes/extensions files.
  *
  * Reads these KSP options (`ksp { arg(...) }` in the consuming module's build script), all
  * optional except `moduleName` in [BuildMode.Module]:
@@ -89,6 +91,22 @@ internal class ScreenGeneratorProcessor(
 
         val screenFunctions: List<KSFunctionDeclaration> =
             resolver.findAnnotations(KoGenScreen::class).filterIsInstance<KSFunctionDeclaration>().toList()
+        val screenFunctionSet = screenFunctions.toSet()
+
+        // @KoGenTab is meant to be used *instead of* @KoGenScreen, never alongside it - stacking
+        // both would otherwise register the same screen's composable(...) entry twice (once via
+        // each one's own grouping/generation pass below). Not a build failure: @KoGenScreen wins
+        // deterministically, @KoGenTab is ignored, and it's reported as a warning.
+        val tabFunctionsRaw = resolver.findAnnotations(KoGenTab::class).filterIsInstance<KSFunctionDeclaration>().toList()
+        val tabFunctions = tabFunctionsRaw.filterNot { it in screenFunctionSet }
+        tabFunctionsRaw.filter { it in screenFunctionSet }.forEach {
+            logger.warn(
+                "${it.simpleName.asString()} carries both @KoGenScreen and @KoGenTab - only one is " +
+                    "supported at a time; using @KoGenScreen, ignoring @KoGenTab.",
+            )
+        }
+
+        val allFunctions = screenFunctions + tabFunctions
 
         // Everything in this block writes a file, and needs to run exactly once - see hasRunOnce's
         // own comment. The *return value* below stays outside of it deliberately: KSP's retry
@@ -98,26 +116,46 @@ internal class ScreenGeneratorProcessor(
         // ends up returning emptyList() anyway - same result, but for the right reason.
         if (!hasRunOnce) {
             hasRunOnce = true
-            fileGenerator.createPackageName(packageName, screenFunctions.asSequence())
+            fileGenerator.createPackageName(packageName, allFunctions.asSequence())
             // Module mode skips this on purpose - see BuildMode.Module's own doc comment for why.
             if (buildMode != BuildMode.Module) fileGenerator.createExtensions()
 
-            // This round's own graphs, whether or not this module has any @KoGenScreen at all - a
-            // plain :app aggregator with none of its own (just combining other modules') is the
-            // common case, not something to skip everything else for.
-            val graphs: List<GraphManifestEntry> = screenFunctions.groupBy {
+            // This round's own graphs, whether or not this module has any @KoGenScreen/@KoGenTab
+            // at all - a plain :app aggregator with none of its own (just combining other
+            // modules') is the common case, not something to skip everything else for. Grouped
+            // separately: a @KoGenScreen group is always plain, a @KoGenTab group always a tab -
+            // see FileWriter.createScreensList's own `isTab` doc for why that's no longer something
+            // to resolve/validate at all, unlike when a screen could carry both annotations.
+            val plainGraphs: List<GraphManifestEntry> = screenFunctions.groupBy {
                 it.stringAnnotationParameterByName(KoGenScreen::class, navHostName)
-            }.mapNotNull {
+            }.mapNotNull { (name, functions) ->
                 fileGenerator.createScreensList(
-                    screensFunctions = it.value,
-                    name = it.key,
+                    screensFunctions = functions,
+                    name = name,
                     viewModelInjector = viewModelInjector,
                     defaultAnimation = defaultAnimation,
                     screenSuffix = screenSuffix,
                     buildMode = buildMode,
+                    annotationClass = KoGenScreen::class,
+                    isTab = false,
                 )
             }
-            if (screenFunctions.isNotEmpty()) fileGenerator.createRoutes(screenFunctions, screenSuffix)
+            val tabGraphs: List<GraphManifestEntry> = tabFunctions.groupBy {
+                it.stringAnnotationParameterByName(KoGenTab::class, "graph")
+            }.mapNotNull { (name, functions) ->
+                fileGenerator.createScreensList(
+                    screensFunctions = functions,
+                    name = name,
+                    viewModelInjector = viewModelInjector,
+                    defaultAnimation = defaultAnimation,
+                    screenSuffix = screenSuffix,
+                    buildMode = buildMode,
+                    annotationClass = KoGenTab::class,
+                    isTab = true,
+                )
+            }
+            val graphs = plainGraphs + tabGraphs
+            if (allFunctions.isNotEmpty()) fileGenerator.createRoutes(allFunctions, screenSuffix)
 
             // A tab graph resolved locally (never deferred to an aggregator - see BuildMode.Module's
             // own branch below) is either this round's *only* way to end up with a NavHost for it
@@ -139,7 +177,7 @@ internal class ScreenGeneratorProcessor(
                     if (moduleName.isNullOrBlank()) {
                         logger.error("buildMode = \"module\" requires the \"moduleName\" KSP option to be set.")
                     } else {
-                        fileGenerator.createManifest(moduleName, manifestGraphs, screenFunctions)
+                        fileGenerator.createManifest(moduleName, manifestGraphs, allFunctions)
                     }
                     fileGenerator.createLocalTabbedNavHost(args["tabsHostName"] ?: "AppTabsHost", localTabGraphs)
                 }
@@ -154,7 +192,7 @@ internal class ScreenGeneratorProcessor(
             }
         }
 
-        return screenFunctions.filterNot { it.validate() }
+        return allFunctions.filterNot { it.validate() }
     }
 
     /** Every function annotated with [kClass], regardless of which `navHostName` it belongs to. */
