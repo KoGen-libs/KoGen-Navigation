@@ -192,11 +192,23 @@ enum class ArgumentTypes(
          * generated `composable(...)` call - a natively-typed `NavType` getter for a recognized
          * type (see [findType]), or a `Gson().fromJson(...)` call against its JSON-encoded string
          * argument for anything else.
+         *
+         * A `String` argument (native or, via [findType] finding nothing, JSON) is URL-decoded
+         * right after reading it back - [RoutesListGenerator] URL-encodes it the same way before
+         * ever embedding it in the route, since a raw value containing a route-special character -
+         * `&` above all: unencoded, everything in the route after it is silently truncated, with
+         * no error at all - would otherwise come back wrong instead of round-tripping exactly.
          */
         fun getArgumentString(parameter: KSValueParameter): String {
             val name = parameter.name?.asString()
             val type = findType(parameter)
             val resolved = parameter.type.resolve()
+
+            if (type == StringType) {
+                val decoded = "it.arguments?.getString(\"$name\")" +
+                    "?.let { raw -> java.net.URLDecoder.decode(raw, \"UTF-8\") }"
+                return if (resolved.isMarkedNullable) decoded else "$decoded.orEmpty()"
+            }
 
             return type?.getArgumentString?.let {
                 "$it(\"$name\")${if (resolved.isMarkedNullable) "" else type.defaultArgumentString}"
@@ -209,12 +221,14 @@ enum class ArgumentTypes(
                 // there's no generic type argument to lose to erasure.
                 val deserialize =
                     "Gson().fromJson<$typeName>(json, object : com.google.gson.reflect.TypeToken<$typeName>() {}.type)"
+                val decoded = "it.arguments?.getString(\"$name\")" +
+                    "?.let { raw -> java.net.URLDecoder.decode(raw, \"UTF-8\") }"
                 if (resolved.isMarkedNullable) {
                     // Null-safe: a missing/absent argument yields null instead of trying (and
                     // failing) to parse an empty string as JSON.
-                    "it.arguments?.getString(\"$name\")?.let { json -> $deserialize }"
+                    "$decoded?.let { json -> $deserialize }"
                 } else {
-                    "it.arguments?.getString(\"$name\").orEmpty().let { json -> $deserialize }"
+                    "$decoded.orEmpty().let { json -> $deserialize }"
                 }
             }
         }

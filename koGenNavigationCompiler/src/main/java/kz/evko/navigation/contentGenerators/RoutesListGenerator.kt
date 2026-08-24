@@ -69,12 +69,18 @@ class RoutesListGenerator(
                 // The route is a Kotlin string *template* referencing the constructor params by
                 // name ("details?id=$id&..."), not a literal - built as source text (emitted
                 // verbatim via %L) rather than through %S, which would escape/quote it as data.
+                //
+                // Every value is URL-encoded, native type or Gson JSON fallback alike - either one
+                // can contain a route-special character in the value itself (`&` above all: left
+                // unencoded, it silently truncates the rest of the route with no error at all,
+                // rather than the crash you might expect) - ArgumentTypes.getArgumentString does
+                // the matching URLDecoder.decode on the read-back side.
                 val routeTemplate = params.joinToString(
                     separator = "&",
                     prefix = "${screenName.lowercase()}?",
                 ) { param ->
-                    paramTypes[param]?.let { "$param=\$$param" }
-                        ?: "$param=\${com.google.gson.Gson().toJson($param)}"
+                    paramTypes[param]?.let { "$param=\${java.net.URLEncoder.encode($param.toString(), \"UTF-8\")}" }
+                        ?: "$param=\${java.net.URLEncoder.encode(com.google.gson.Gson().toJson($param), \"UTF-8\")}"
                 }
 
                 fileBuilder.addType(
