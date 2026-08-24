@@ -2,6 +2,7 @@ package kz.evko.navigation.contentGenerators
 
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSValueParameter
+import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.BOOLEAN
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
@@ -95,6 +96,13 @@ class RoutesListGenerator(
      * `BackStackData` result, then pops), and `getResultData` (reads
      * that result back out, clearing it by default). `BackStackData` isn't a compile dependency of
      * this module, so it's referenced here by name rather than as a resolvable KDoc link.
+     *
+     * All three now also live as real, hand-written functions in `koGenNavigation` itself (under
+     * `kz.evko.navigation.helpers`) - the runtime dependency the Gradle plugin adds is now always
+     * pinned to the matching version, so there's no need to keep re-emitting identical text into
+     * every consumer. These generated copies are kept, `@Deprecated`, for one transitional release
+     * so upgrading doesn't break existing call sites; drop [generateExtensions] entirely once that
+     * transition period is over.
      */
     fun generateExtensions(): FileSpec {
         val navHostController = ClassName("androidx.navigation", "NavHostController")
@@ -104,6 +112,12 @@ class RoutesListGenerator(
         val typeVariableT = TypeVariableName("T")
 
         val navigateSafety = FunSpec.builder("navigateSafety")
+            .addAnnotation(
+                deprecatedInFavorOfRuntime(
+                    "navigateSafety(action, popUpTo, inclusive)",
+                    "kz.evko.navigation.helpers.navigateSafety",
+                ),
+            )
             .addKdoc(
                 """
                 |Logs the navigation, then navigates to [action]'s route.
@@ -138,6 +152,12 @@ class RoutesListGenerator(
             .build()
 
         val popBackSafety = FunSpec.builder("popBackSafety")
+            .addAnnotation(
+                deprecatedInFavorOfRuntime(
+                    "popBackSafety(backStackData)",
+                    "kz.evko.navigation.helpers.popBackSafety",
+                ),
+            )
             .addKdoc(
                 """
                 |Logs the pop, optionally stashes [backStackData] for the screen being returned to
@@ -177,6 +197,12 @@ class RoutesListGenerator(
             .build()
 
         val getResultData = FunSpec.builder("getResultData")
+            .addAnnotation(
+                deprecatedInFavorOfRuntime(
+                    "getResultData(data, clearData)",
+                    "kz.evko.navigation.helpers.getResultData",
+                ),
+            )
             .addKdoc(
                 """
                 |Reads back a result previously stashed via [popBackSafety], or `null` if none was.
@@ -211,4 +237,23 @@ class RoutesListGenerator(
             .addFunction(getResultData)
             .build()
     }
+
+    /**
+     * `@Deprecated(message = ..., replaceWith = ReplaceWith([expression], [replacementFqName]))` -
+     * points a generated helper at its real, hand-written counterpart living in `koGenNavigation`
+     * (see [generateExtensions]'s own kdoc for why the generated copy still exists at all).
+     */
+    private fun deprecatedInFavorOfRuntime(expression: String, replacementFqName: String): AnnotationSpec =
+        AnnotationSpec.builder(Deprecated::class)
+            .addMember(
+                "message = %S",
+                "Moved into the library itself - this generated copy will be removed in a future release.",
+            )
+            .addMember(
+                "replaceWith = %T(%S, %S)",
+                ClassName("kotlin", "ReplaceWith"),
+                expression,
+                replacementFqName,
+            )
+            .build()
 }
