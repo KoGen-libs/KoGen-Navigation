@@ -30,13 +30,13 @@ import androidx.navigation.compose.rememberNavController
 import kz.evko.navigation.annotation.KoGenScreen
 import kz.evko.navigation.helpers.BackStackData
 import kz.evko.navigation.helpers.NavigationResultKey
+import kz.evko.navigation.helpers.getResultData
+import kz.evko.navigation.helpers.navigateSafety
+import kz.evko.navigation.helpers.popBackSafety
 import kz.evko.navigation.navigation.ActionToFourth
 import kz.evko.navigation.navigation.ActionToSecond
 import kz.evko.navigation.navigation.ActionToThird
 import kz.evko.navigation.navigation.AppNavHost
-import kz.evko.navigation.navigation.getResultData
-import kz.evko.navigation.navigation.navigateSafety
-import kz.evko.navigation.navigation.popBackSafety
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,7 +49,7 @@ class MainActivity : ComponentActivity() {
             if (showTabsDemo) {
                 TabsDemo()
             } else {
-                Column {
+                Column(modifier = Modifier.statusBarsPadding()) {
                     Button(onClick = { showTabsDemo = true }) {
                         Text("Show tabs demo")
                     }
@@ -83,7 +83,8 @@ fun MainScreen(
             navController.navigateSafety(
                 ActionToSecond(
                     title = "Второй",
-                )
+                ),
+                null, false
             )
         },
         backClick = {}
@@ -113,7 +114,7 @@ fun SecondScreen(
         },
         backClick = {
             navController.popBackSafety(
-                backStackData = BackStackData(NavigationResultValues.ShowToast, true)
+                BackStackData(NavigationResultValues.ShowToast, true)
             )
         }
     )
