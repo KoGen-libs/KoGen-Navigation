@@ -43,6 +43,15 @@ class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {
  *   ignored otherwise.
  * - `aggregateHostName` - the combined `NavHost` function/file's name, default `"AppNavHost"`.
  *   Only meaningful in [BuildMode.Aggregator].
+ * - `tabsHostName` - the combined `NavHost` function/file's name for this round's own tab graphs
+ *   (see `@KoGenNavigationTab`), default `"AppTabsHost"` - deliberately not `"AppNavHost"`, the
+ *   default `navHostName`: an untagged group named that already owns that exact file (its own
+ *   self-contained `NavHost`), which this would otherwise collide with. Only meaningful in
+ *   [BuildMode.Single], or in [BuildMode.Module] with `shareTabGraph = false`.
+ * - `shareTabGraph` - whether a [BuildMode.Module] module defers wrapping its own tab graphs to a
+ *   [BuildMode.Aggregator] (`true`, the default - lets a tab span more than one module) or builds
+ *   them itself, locally, via `tabsHostName` (`false` - e.g. this module isn't meant to depend on
+ *   ever being combined by one at all). Ignored outside [BuildMode.Module].
  */
 internal class ScreenGeneratorProcessor(
     private val fileGenerator: FileWriter,
@@ -110,15 +119,29 @@ internal class ScreenGeneratorProcessor(
             }
             if (screenFunctions.isNotEmpty()) fileGenerator.createRoutes(screenFunctions, screenSuffix)
 
+            // A tab graph resolved locally (never deferred to an aggregator - see BuildMode.Module's
+            // own branch below) is either this round's *only* way to end up with a NavHost for it
+            // (BuildMode.Single - createGraph() already skipped generating a standalone one for a
+            // tab-tagged group) or one this round additionally builds on top of contributing to the
+            // manifest as normal (BuildMode.Module, shareTabGraph = false) - either way it's kept
+            // out of the manifest, since nothing reads it back from there once it's already handled.
+            val shareTabGraph = args["shareTabGraph"]?.toBooleanStrictOrNull() ?: true
+            val (localTabGraphs, manifestGraphs) = graphs.partition {
+                it.tabGraph != null && (buildMode == BuildMode.Single || (buildMode == BuildMode.Module && !shareTabGraph))
+            }
+
             when (buildMode) {
-                BuildMode.Single -> Unit
+                BuildMode.Single -> {
+                    fileGenerator.createLocalTabbedNavHost(args["tabsHostName"] ?: "AppTabsHost", localTabGraphs)
+                }
                 BuildMode.Module -> {
                     val moduleName = args["moduleName"]
                     if (moduleName.isNullOrBlank()) {
                         logger.error("buildMode = \"module\" requires the \"moduleName\" KSP option to be set.")
                     } else {
-                        fileGenerator.createManifest(moduleName, graphs, screenFunctions)
+                        fileGenerator.createManifest(moduleName, manifestGraphs, screenFunctions)
                     }
+                    fileGenerator.createLocalTabbedNavHost(args["tabsHostName"] ?: "AppTabsHost", localTabGraphs)
                 }
                 BuildMode.Aggregator -> {
                     val manifestsDir = args["aggregateManifestsDir"]

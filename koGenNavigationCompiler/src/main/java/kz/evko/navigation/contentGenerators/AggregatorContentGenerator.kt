@@ -7,6 +7,7 @@ import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.STRING
+import kz.evko.navigation.manifest.GraphManifestEntry
 import kz.evko.navigation.manifest.ModuleManifest
 
 /**
@@ -22,16 +23,24 @@ internal class AggregatorContentGenerator(
     private val modifierType = ClassName("androidx.compose.ui", "Modifier")
     private val navHostControllerType = ClassName("androidx.navigation", "NavHostController")
     private val navHostMember = MemberName("androidx.navigation.compose", "NavHost")
+    private val navigationMember = MemberName("androidx.navigation.compose", "navigation")
+
+    /** One manifest's [GraphManifestEntry], plus that manifest's own package (to qualify [GraphManifestEntry.graphFunctionName] with). */
+    private data class Entry(val packageName: String, val graph: GraphManifestEntry)
 
     /**
      * @param startDestinationRoute The route to default the generated function's own
      *   `startDestination` parameter to (see `ManifestValidator.resolveStartDestinationRoute`) -
      *   `null` makes it a required parameter instead, since there's nothing to default to.
+     * @param tabStartDestinations Every tab's own `startDestination` route, keyed by
+     *   [GraphManifestEntry.tabGraph] (see `ManifestValidator.resolveTabStartDestinations`) - every
+     *   non-null `tabGraph` across [manifests] must have an entry here.
      */
     fun generateAppNavHost(
         manifests: List<ModuleManifest>,
         hostName: String,
         startDestinationRoute: String?,
+        tabStartDestinations: Map<String, String>,
     ): FileSpec {
         val startDestinationParam = ParameterSpec.builder("startDestination", STRING).apply {
             if (startDestinationRoute != null) defaultValue("%S", startDestinationRoute)
@@ -42,7 +51,7 @@ internal class AggregatorContentGenerator(
             .addParameter(ParameterSpec.builder("modifier", modifierType).defaultValue("%T", modifierType).build())
             .addParameter("navController", navHostControllerType)
             .addParameter(startDestinationParam)
-            .addCode(generateBody(manifests))
+            .addCode(generateBody(manifests, tabStartDestinations))
             .build()
 
         return FileSpec.builder(packageName, hostName)
@@ -50,19 +59,40 @@ internal class AggregatorContentGenerator(
             .build()
     }
 
-    /** `NavHost(...) { moduleAGraph(navController); moduleBGraph(navController); ... }` - one call per manifest's graph(s). */
-    private fun generateBody(manifests: List<ModuleManifest>): CodeBlock = CodeBlock.builder()
-        .beginControlFlow(
-            "%M(modifier = modifier, navController = navController, startDestination = startDestination)",
-            navHostMember,
-        )
-        .apply {
-            manifests.forEach { manifest ->
-                manifest.graphs.forEach { graph ->
-                    addStatement("%M(navController)", MemberName(manifest.packageName, graph.graphFunctionName))
+    /**
+     * `NavHost(...) { moduleAGraph(navController); navigation(...) { moduleBGraph(navController); ... } }` -
+     * a plain, un-tabbed [GraphManifestEntry] gets called directly, same as always; every entry
+     * sharing a non-null [GraphManifestEntry.tabGraph] - however many manifests it's split across -
+     * gets grouped into one shared `navigation(route = tabGraph, startDestination = ...) { }` block instead.
+     */
+    private fun generateBody(manifests: List<ModuleManifest>, tabStartDestinations: Map<String, String>): CodeBlock {
+        val entries = manifests.flatMap { manifest -> manifest.graphs.map { Entry(manifest.packageName, it) } }
+        val (tabbed, plain) = entries.partition { it.graph.tabGraph != null }
+        val tabGroups = tabbed.groupBy { it.graph.tabGraph!! }
+
+        return CodeBlock.builder()
+            .beginControlFlow(
+                "%M(modifier = modifier, navController = navController, startDestination = startDestination)",
+                navHostMember,
+            )
+            .apply {
+                plain.forEach { entry -> addGraphCall(entry) }
+                tabGroups.forEach { (tabGraph, groupEntries) ->
+                    beginControlFlow(
+                        "%M(startDestination = %S, route = %S)",
+                        navigationMember,
+                        tabStartDestinations.getValue(tabGraph),
+                        tabGraph,
+                    )
+                    groupEntries.forEach { entry -> addGraphCall(entry) }
+                    endControlFlow()
                 }
             }
-        }
-        .endControlFlow()
-        .build()
+            .endControlFlow()
+            .build()
+    }
+
+    private fun CodeBlock.Builder.addGraphCall(entry: Entry) {
+        addStatement("%M(navController)", MemberName(entry.packageName, entry.graph.graphFunctionName))
+    }
 }

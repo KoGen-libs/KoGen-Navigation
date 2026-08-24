@@ -15,11 +15,12 @@ class ManifestValidator(
     private data class ScreenLocation(
         val module: String,
         val screen: ScreenManifestEntry,
+        val tabGraph: String?,
     )
 
     private val allScreens: List<ScreenLocation> = manifests.flatMap { manifest ->
         manifest.graphs.flatMap { graph ->
-            graph.screens.map { screen -> ScreenLocation(manifest.module, screen) }
+            graph.screens.map { screen -> ScreenLocation(manifest.module, screen, graph.tabGraph) }
         }
     }
 
@@ -58,5 +59,23 @@ class ManifestValidator(
         val ordered = allScreens.sortedBy { it.module }
         return ordered.firstOrNull { it.screen.isStartDestination }?.screen?.route
             ?: ordered.firstOrNull()?.screen?.route
+    }
+
+    /**
+     * The route to default each tab graph's own `startDestination` to, keyed by
+     * [kz.evko.navigation.manifest.GraphManifestEntry.tabGraph] - same resolution as
+     * [resolveStartDestinationRoute], just scoped to each tab's own screens instead of the whole
+     * app: the first one (by module, then declaration order) flagged
+     * `@KoGenNavigationTab(startDestination = true)`, or - if none in that tab was - its first
+     * screen overall. Every distinct tab name found across [manifests] gets an entry; a tab
+     * necessarily has at least one screen, since it only exists because some screen named it.
+     */
+    fun resolveTabStartDestinations(): Map<String, String> {
+        val ordered = allScreens.sortedBy { it.module }
+        return ordered.mapNotNull { it.tabGraph }.distinct().associateWith { tabGraph ->
+            val screens = ordered.filter { it.tabGraph == tabGraph }
+            screens.firstOrNull { it.screen.isTabStartDestination }?.screen?.route
+                ?: screens.first().screen.route
+        }
     }
 }

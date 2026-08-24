@@ -9,6 +9,8 @@ data class ScreenManifestEntry(
     val route: String,
     val name: String,
     val isStartDestination: Boolean,
+    /** Whether this screen is its [GraphManifestEntry.tabGraph]'s own `startDestination` - see `@KoGenNavigationTab`. */
+    val isTabStartDestination: Boolean = false,
 )
 
 /**
@@ -19,6 +21,14 @@ data class ScreenManifestEntry(
 data class GraphManifestEntry(
     val graphFunctionName: String,
     val screens: List<ScreenManifestEntry>,
+    /**
+     * The tab this `navHostName` group is nested under (see `@KoGenNavigationTab`), or `null` for
+     * a plain, non-nested group - unchanged, flat behavior. An aggregator (or a module resolving
+     * its own tab locally - see the `shareTabGraph` KSP option) groups every [GraphManifestEntry]
+     * sharing the same non-null [tabGraph] - however many modules it's split across - into one
+     * `navigation(route = tabGraph, startDestination = ...) { }` block.
+     */
+    val tabGraph: String? = null,
 )
 
 /**

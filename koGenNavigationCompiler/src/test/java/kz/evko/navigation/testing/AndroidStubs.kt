@@ -220,6 +220,13 @@ internal val androidStubSources: List<SourceFile> = listOf(
         ) {
         }
 
+        fun NavGraphBuilder.navigation(
+            startDestination: String,
+            route: String,
+            builder: NavGraphBuilder.() -> Unit,
+        ) {
+        }
+
         fun NavGraphBuilder.composable(
             route: String,
             arguments: List<NamedNavArgument> = emptyList(),
