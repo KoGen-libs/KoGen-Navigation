@@ -75,7 +75,7 @@ abstract class KoGenNavigationExtension {
     abstract val aggregateHostName: Property<String>
 
     /**
-     * The combined `NavHost` function/file's name for this module's own `@KoGenNavigationTab`
+     * The combined `NavHost` function/file's name for this module's own `@KoGenTab`
      * graphs - in [BuildMode.Single], or in [BuildMode.Module] with [shareTabGraph] set to `false`.
      * Defaults to `"AppTabsHost"` - deliberately not `"AppNavHost"` (the default `navHostName`,
      * and [aggregateHostName]'s own default): an untagged group named that already owns that exact
@@ -84,7 +84,7 @@ abstract class KoGenNavigationExtension {
     abstract val tabsHostName: Property<String>
 
     /**
-     * Whether a [BuildMode.Module] module defers wrapping its own `@KoGenNavigationTab` graphs to
+     * Whether a [BuildMode.Module] module defers wrapping its own `@KoGenTab` graphs to
      * a [BuildMode.Aggregator] (`true`, the default - lets one tab span more than one module) or
      * builds them itself, locally, as [tabsHostName] - e.g. this module isn't meant to depend on
      * ever being combined by one at all. Ignored outside [BuildMode.Module].

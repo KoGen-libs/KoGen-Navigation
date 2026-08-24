@@ -13,7 +13,7 @@ import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.STRING
 import com.squareup.kotlinpoet.ksp.toTypeName
-import kz.evko.navigation.annotation.KoGenNavigationTab
+import kz.evko.navigation.annotation.KoGenTab
 import kz.evko.navigation.annotation.KoGenScreen
 import kz.evko.navigation.annotationParameterByName
 import kz.evko.navigation.booleanAnnotationParameterByName
@@ -284,7 +284,7 @@ fun List<KSFunctionDeclaration>.findPreferredStartDestination(): KSFunctionDecla
 
 /**
  * This `navHostName` group's tab name, resolved from every screen's own optional
- * `@KoGenNavigationTab(graph = ...)` - `null` if none of them carry it (the group then stays a
+ * `@KoGenTab(graph = ...)` - `null` if none of them carry it (the group then stays a
  * plain, non-nested graph, exactly as it was before this annotation existed). More than one
  * distinct non-blank value across the group can't fail the build - a helper library never should
  * over a preference conflict it can resolve deterministically on its own - so the first one found
@@ -292,28 +292,28 @@ fun List<KSFunctionDeclaration>.findPreferredStartDestination(): KSFunctionDecla
  */
 fun List<KSFunctionDeclaration>.resolveTabGraphName(logger: KSPLogger): String? {
     val named = mapNotNull {
-        it.stringAnnotationParameterByNameOrNull(KoGenNavigationTab::class, "graph")?.takeIf { name -> name.isNotBlank() }
+        it.stringAnnotationParameterByNameOrNull(KoGenTab::class, "graph")?.takeIf { name -> name.isNotBlank() }
     }
     val distinct = named.distinct()
     if (distinct.size > 1) {
         logger.warn(
-            "@KoGenNavigationTab: this navHostName group names more than one tab graph $distinct - using \"${distinct.first()}\".",
+            "@KoGenTab: this navHostName group names more than one tab graph $distinct - using \"${distinct.first()}\".",
         )
     }
     return distinct.firstOrNull()
 }
 
 /**
- * The screen (if any) explicitly flagged `@KoGenNavigationTab(startDestination = true)` - `null`
+ * The screen (if any) explicitly flagged `@KoGenTab(startDestination = true)` - `null`
  * if none was, in which case [kz.evko.navigation.manifest.ManifestValidator.resolveTabStartDestinations]
  * falls back to this tab's first screen overall, same policy as [findPreferredStartDestination]'s
  * own app-wide fallback. More than one flagged screen can't fail the build either - the first one
  * wins, the rest reported via [logger] as a warning.
  */
 fun List<KSFunctionDeclaration>.findPreferredTabStartDestination(logger: KSPLogger): KSFunctionDeclaration? {
-    val flagged = filter { it.booleanAnnotationParameterByNameOrNull(KoGenNavigationTab::class, "startDestination") == true }
+    val flagged = filter { it.booleanAnnotationParameterByNameOrNull(KoGenTab::class, "startDestination") == true }
     if (flagged.size > 1) {
-        logger.warn("@KoGenNavigationTab: more than one startDestination = true in the same tab graph - using the first.")
+        logger.warn("@KoGenTab: more than one startDestination = true in the same tab graph - using the first.")
     }
     return flagged.firstOrNull()
 }

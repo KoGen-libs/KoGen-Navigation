@@ -23,7 +23,7 @@ package kz.evko.navigation.annotation
  */
 @Target(AnnotationTarget.FUNCTION)
 @Retention(AnnotationRetention.SOURCE)
-annotation class KoGenNavigationTab(
+annotation class KoGenTab(
     /** This tab's own route in the shared `NavHost` - what a tab bar's `navController.navigate(...)` targets. */
     val graph: String,
     /** Whether this screen is [graph]'s own `startDestination`. Exactly one screen per tab should set this. */

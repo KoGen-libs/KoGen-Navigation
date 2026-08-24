@@ -98,7 +98,7 @@ internal class FileWriter(
      * always (an aggregator's own local screens, if it has any, need to end up callable from *its
      * own* combined `NavHost` exactly the same way every other module's do, not a second, rival
      * self-contained one under the same default name), and [BuildMode.Single] too as soon as any of
-     * this group's screens name a tab via `@KoGenNavigationTab` - a tab is always nested inside a
+     * this group's screens name a tab via `@KoGenTab` - a tab is always nested inside a
      * shared `NavHost` (see [createLocalTabbedNavHost]/`createAggregatedNavHost`), never its own
      * separate one, regardless of build mode.
      *
@@ -308,7 +308,7 @@ internal fun KSFunctionDeclaration.booleanAnnotationParameterByName(
 
 /**
  * Same as [stringAnnotationParameterByName], but for an annotation that might not be present on
- * this function at all (e.g. `@KoGenNavigationTab`, unlike `@KoGenScreen` itself - every function
+ * this function at all (e.g. `@KoGenTab`, unlike `@KoGenScreen` itself - every function
  * these helpers usually run on is already guaranteed to have that one). `null` either way: the
  * annotation isn't there, or it is but [parameterName] isn't a `String`.
  */

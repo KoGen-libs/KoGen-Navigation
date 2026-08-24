@@ -13,7 +13,7 @@ import java.io.File
 import java.nio.file.Path
 
 /**
- * `@KoGenNavigationTab` - the group of screens sharing a `navHostName` becomes a nested
+ * `@KoGenTab` - the group of screens sharing a `navHostName` becomes a nested
  * `navigation(route = graph, startDestination = ...) { }` block inside one shared `NavHost`,
  * instead of either a flat merge or its own separate `NavHost`. Covers all three build modes, the
  * `shareTabGraph` local-vs-aggregator split, and the "never crash, first wins, warn" conflict policy.
@@ -24,11 +24,11 @@ class ScreenGeneratorNavigationTabTest {
         package test.app.screens
 
         import androidx.compose.runtime.Composable
-        import kz.evko.navigation.annotation.KoGenNavigationTab
+        import kz.evko.navigation.annotation.KoGenTab
         import kz.evko.navigation.annotation.KoGenScreen
 
         @KoGenScreen(navHostName = "home", startDestination = true)
-        @KoGenNavigationTab(graph = "homeTab", startDestination = true)
+        @KoGenTab(graph = "homeTab", startDestination = true)
         @Composable
         fun HomeScreen() {
         }
@@ -101,17 +101,17 @@ class ScreenGeneratorNavigationTabTest {
             package test.app.screens
 
             import androidx.compose.runtime.Composable
-            import kz.evko.navigation.annotation.KoGenNavigationTab
+            import kz.evko.navigation.annotation.KoGenTab
             import kz.evko.navigation.annotation.KoGenScreen
 
             @KoGenScreen(navHostName = "home", startDestination = true)
-            @KoGenNavigationTab(graph = "homeTab", startDestination = true)
+            @KoGenTab(graph = "homeTab", startDestination = true)
             @Composable
             fun HomeScreen() {
             }
 
             @KoGenScreen(navHostName = "profile", startDestination = true)
-            @KoGenNavigationTab(graph = "profileTab", startDestination = true)
+            @KoGenTab(graph = "profileTab", startDestination = true)
             @Composable
             fun ProfileScreen() {
             }
@@ -149,17 +149,17 @@ class ScreenGeneratorNavigationTabTest {
             package test.app.screens
 
             import androidx.compose.runtime.Composable
-            import kz.evko.navigation.annotation.KoGenNavigationTab
+            import kz.evko.navigation.annotation.KoGenTab
             import kz.evko.navigation.annotation.KoGenScreen
 
             @KoGenScreen(navHostName = "home", startDestination = true)
-            @KoGenNavigationTab(graph = "homeTab")
+            @KoGenTab(graph = "homeTab")
             @Composable
             fun HomeScreen() {
             }
 
             @KoGenScreen(navHostName = "home")
-            @KoGenNavigationTab(graph = "otherTab")
+            @KoGenTab(graph = "otherTab")
             @Composable
             fun HomeDetailsScreen() {
             }
@@ -180,17 +180,17 @@ class ScreenGeneratorNavigationTabTest {
             package test.app.screens
 
             import androidx.compose.runtime.Composable
-            import kz.evko.navigation.annotation.KoGenNavigationTab
+            import kz.evko.navigation.annotation.KoGenTab
             import kz.evko.navigation.annotation.KoGenScreen
 
             @KoGenScreen(navHostName = "home", startDestination = true)
-            @KoGenNavigationTab(graph = "homeTab", startDestination = true)
+            @KoGenTab(graph = "homeTab", startDestination = true)
             @Composable
             fun HomeScreen() {
             }
 
             @KoGenScreen(navHostName = "home")
-            @KoGenNavigationTab(graph = "homeTab", startDestination = true)
+            @KoGenTab(graph = "homeTab", startDestination = true)
             @Composable
             fun HomeDetailsScreen() {
             }
@@ -210,11 +210,11 @@ class ScreenGeneratorNavigationTabTest {
             package test.app.screens
 
             import androidx.compose.runtime.Composable
-            import kz.evko.navigation.annotation.KoGenNavigationTab
+            import kz.evko.navigation.annotation.KoGenTab
             import kz.evko.navigation.annotation.KoGenScreen
 
             @KoGenScreen(navHostName = "home")
-            @KoGenNavigationTab(graph = "homeTab")
+            @KoGenTab(graph = "homeTab")
             @Composable
             fun HomeScreen() {
             }

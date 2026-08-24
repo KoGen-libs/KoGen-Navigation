@@ -44,7 +44,7 @@ class ScreenGeneratorProcessorProvider : SymbolProcessorProvider {
  * - `aggregateHostName` - the combined `NavHost` function/file's name, default `"AppNavHost"`.
  *   Only meaningful in [BuildMode.Aggregator].
  * - `tabsHostName` - the combined `NavHost` function/file's name for this round's own tab graphs
- *   (see `@KoGenNavigationTab`), default `"AppTabsHost"` - deliberately not `"AppNavHost"`, the
+ *   (see `@KoGenTab`), default `"AppTabsHost"` - deliberately not `"AppNavHost"`, the
  *   default `navHostName`: an untagged group named that already owns that exact file (its own
  *   self-contained `NavHost`), which this would otherwise collide with. Only meaningful in
  *   [BuildMode.Single], or in [BuildMode.Module] with `shareTabGraph = false`.
