@@ -16,6 +16,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -39,7 +43,22 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            AppNavHost(navController = rememberNavController())
+            // Toggle so both demos stay reachable in one Activity: the original flat-screen flow
+            // (AppNavHost) and the @KoGenTab nested-graph one (TabsDemo) - see TabsDemo.kt.
+            var showTabsDemo by remember { mutableStateOf(false) }
+            if (showTabsDemo) {
+                TabsDemo()
+            } else {
+                Column {
+                    Button(onClick = { showTabsDemo = true }) {
+                        Text("Show tabs demo")
+                    }
+                    AppNavHost(
+                        modifier = Modifier.weight(1f),
+                        navController = rememberNavController(),
+                    )
+                }
+            }
         }
     }
 }
