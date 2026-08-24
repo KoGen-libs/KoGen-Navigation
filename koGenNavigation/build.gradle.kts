@@ -40,6 +40,7 @@ android {
 dependencies {
     api(project(":koGenNavigationCommon"))
     api(libs.gson)
+    implementation(libs.androidx.navigation)
 
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)

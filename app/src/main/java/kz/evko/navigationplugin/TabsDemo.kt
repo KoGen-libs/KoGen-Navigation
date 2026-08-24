@@ -16,13 +16,14 @@ import kz.evko.navigation.annotation.KoGenTab
 import kz.evko.navigation.navigation.ActionToHomeTab
 import kz.evko.navigation.navigation.ActionToProfileTab
 import kz.evko.navigation.navigation.AppTabsHost
-import kz.evko.navigation.navigation.navigateSafety
+import kz.evko.navigation.routes.navigateSafety
 
 // Two single-screen tabs, BuildMode.Single (this module sets no buildMode - the compiler default)
 // - @KoGenTab alone, no @KoGenScreen: verifies a tab screen needs no second annotation, and nests
 // its group into one shared NavHost even with no aggregator/module split at all, combined into the
-// generated AppTabsHost below (tabsHostName's own default) along with a generated, typed
-// ActionToHomeTab/ActionToProfileTab for the tab bar below to pass to the shared navigateSafety overload.
+// generated AppTabsHost below (tabsHostName's own default). ActionToHomeTab/ActionToProfileTab are
+// generated (per-project route), but navigateSafety(action: TabNavigationAction) itself is the
+// real, hand-written overload from koGenNavigation - not regenerated here.
 @KoGenTab(graph = "homeTab", startDestination = true)
 @Composable
 fun HomeScreen() {
@@ -35,7 +36,7 @@ fun ProfileScreen() {
     Text("Profile tab")
 }
 
-/** A real bottom nav bar driving the generated `AppTabsHost` via the generated `navigateSafety` overload. */
+/** A real bottom nav bar driving the generated `AppTabsHost` via the library's own `navigateSafety` overload. */
 @Composable
 fun TabsDemo() {
     val navController = rememberNavController()

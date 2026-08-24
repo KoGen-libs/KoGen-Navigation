@@ -12,6 +12,16 @@ import com.squareup.kotlinpoet.TypeSpec
 import kz.evko.navigation.manifest.GraphManifestEntry
 import kz.evko.navigation.manifest.ModuleManifest
 
+/*
+ * navigateSafety(action: TabNavigationAction) itself is NOT generated here (or anywhere) - it's a
+ * real, hand-written function in koGenNavigation (kz.evko.navigation.routes.TabNavigationAction.kt),
+ * same as navigateSafety(action: NavigationAction, ...)/popBackSafety/getResultData are meant to
+ * be: it's pure boilerplate with no per-project types in it at all, and the Gradle plugin already
+ * guarantees a matching runtime version, so there's nothing to gain by re-emitting identical text
+ * into every project - only [generateTabAction] (which needs each tab's own route) has any actual
+ * per-project information to contribute.
+ */
+
 /**
  * Builds the combined `@Composable fun <hostName>(navController, modifier, startDestination)` an
  * aggregator (`BuildMode.Aggregator`) generates from every `BuildMode.Module` manifest it
@@ -26,16 +36,6 @@ internal class AggregatorContentGenerator(
     private val navHostControllerType = ClassName("androidx.navigation", "NavHostController")
     private val navHostMember = MemberName("androidx.navigation.compose", "NavHost")
     private val navigationMember = MemberName("androidx.navigation.compose", "navigation")
-
-    // findStartDestination() lives in NavGraph's own companion, not as a plain top-level function
-    // in the package - importing it as if it were (the natural-looking MemberName("androidx.navigation",
-    // "findStartDestination")) silently resolves to nothing, and the knock-on type-inference
-    // failure was confusing enough to be worth this comment: `popUpTo(...)`'s argument becomes an
-    // error type, which somehow still type-checks the call but resolves its trailing lambda's
-    // implicit receiver to the *outer* NavOptionsBuilder instead of PopUpToBuilder - so `saveState`
-    // inside it fails as "private in NavOptionsBuilder" instead of the actually-missing-symbol
-    // error you'd expect.
-    private val findStartDestinationMember = MemberName(ClassName("androidx.navigation", "NavGraph", "Companion"), "findStartDestination")
     private val tabNavigationActionType = ClassName("kz.evko.navigation.routes", "TabNavigationAction")
 
     /** One manifest's [GraphManifestEntry], plus that manifest's own package (to qualify [GraphManifestEntry.graphFunctionName] with). */
@@ -69,43 +69,11 @@ internal class AggregatorContentGenerator(
 
         val fileBuilder = FileSpec.builder(packageName, hostName)
             .addFunction(hostFunction)
-        if (tabStartDestinations.isNotEmpty()) {
-            fileBuilder.addFunction(generateTabNavigateSafetyOverload())
-            tabStartDestinations.keys.forEach { tabGraph -> fileBuilder.addType(generateTabAction(tabGraph)) }
-        }
+        tabStartDestinations.keys.forEach { tabGraph -> fileBuilder.addType(generateTabAction(tabGraph)) }
         return fileBuilder.build()
     }
 
-    /**
-     * `fun NavHostController.navigateSafety(action: TabNavigationAction)` - overloads the same
-     * name a screen's own `navigateSafety(action: NavigationAction, ...)` uses (see
-     * `RoutesListGenerator.generateExtensions`), so there's one call to remember regardless of
-     * what's being navigated to - Kotlin picks the right overload from [TabNavigationAction] vs
-     * `NavigationAction` being unrelated types, the same way it always resolves an overload by
-     * argument type. One shared function for every tab (not one per tab - the recipe itself never
-     * varies, only [TabNavigationAction.route] does), applying Google's recommended tab-switch
-     * recipe (`popUpTo` the graph's own start with `saveState`, `launchSingleTop`, `restoreState`)
-     * so a tab bar's `onClick` doesn't need to spell it out by hand, or duplicate it, for every tab.
-     */
-    private fun generateTabNavigateSafetyOverload(): FunSpec =
-        FunSpec.builder("navigateSafety")
-            .receiver(navHostControllerType)
-            .addKdoc("Switches to [action]'s tab, preserving its own back stack/scroll position.")
-            .addParameter("action", tabNavigationActionType)
-            .addCode(
-                CodeBlock.builder()
-                    .beginControlFlow("navigate(action.route)")
-                    .beginControlFlow("popUpTo(graph.%M().id)", findStartDestinationMember)
-                    .addStatement("saveState = true")
-                    .endControlFlow()
-                    .addStatement("launchSingleTop = true")
-                    .addStatement("restoreState = true")
-                    .endControlFlow()
-                    .build(),
-            )
-            .build()
-
-    /** `data object ActionTo<Graph> : TabNavigationAction(route = tabGraph)` - a typed reference to pass [generateTabNavigateSafetyOverload]'s own `navigateSafety` overload. */
+    /** `data object ActionTo<Graph> : TabNavigationAction(route = tabGraph)` - a typed reference to pass to the runtime's `navigateSafety(action: TabNavigationAction)` overload. */
     private fun generateTabAction(tabGraph: String): TypeSpec =
         TypeSpec.objectBuilder("ActionTo" + tabGraph.replaceFirstChar { it.uppercase() })
             .addModifiers(KModifier.DATA)
