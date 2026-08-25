@@ -4,11 +4,9 @@ import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.STRING
-import com.squareup.kotlinpoet.TypeSpec
 import kz.evko.navigation.manifest.GraphManifestEntry
 import kz.evko.navigation.manifest.ModuleManifest
 
@@ -18,8 +16,11 @@ import kz.evko.navigation.manifest.ModuleManifest
  * same as navigateSafety(action: NavigationAction, ...)/popBackSafety/getResultData are meant to
  * be: it's pure boilerplate with no per-project types in it at all, and the Gradle plugin already
  * guarantees a matching runtime version, so there's nothing to gain by re-emitting identical text
- * into every project - only [generateTabAction] (which needs each tab's own route) has any actual
- * per-project information to contribute.
+ * into every project. Each tab screen's own `ActionTo<Screen> : TabNavigationAction` isn't built
+ * here either - it's generated locally, per module, alongside every plain screen's own action (see
+ * `RoutesListGenerator.generateTabRoutes`/`FileWriter.createTabRoutes`), since a tab screen's route
+ * is already fully known without waiting for this aggregation step at all. This class only ever
+ * builds the combined `NavHost` itself.
  */
 
 /**
@@ -36,7 +37,6 @@ internal class AggregatorContentGenerator(
     private val navHostControllerType = ClassName("androidx.navigation", "NavHostController")
     private val navHostMember = MemberName("androidx.navigation.compose", "NavHost")
     private val navigationMember = MemberName("androidx.navigation.compose", "navigation")
-    private val tabNavigationActionType = ClassName("kz.evko.navigation.routes", "TabNavigationAction")
 
     /** One manifest's [GraphManifestEntry], plus that manifest's own package (to qualify [GraphManifestEntry.graphFunctionName] with). */
     private data class Entry(val packageName: String, val graph: GraphManifestEntry)
@@ -67,19 +67,10 @@ internal class AggregatorContentGenerator(
             .addCode(generateBody(manifests, tabStartDestinations))
             .build()
 
-        val fileBuilder = FileSpec.builder(packageName, hostName)
+        return FileSpec.builder(packageName, hostName)
             .addFunction(hostFunction)
-        tabStartDestinations.keys.forEach { tabGraph -> fileBuilder.addType(generateTabAction(tabGraph)) }
-        return fileBuilder.build()
-    }
-
-    /** `data object ActionTo<Graph> : TabNavigationAction(route = tabGraph)` - a typed reference to pass to the runtime's `navigateSafety(action: TabNavigationAction)` overload. */
-    private fun generateTabAction(tabGraph: String): TypeSpec =
-        TypeSpec.objectBuilder("ActionTo" + tabGraph.replaceFirstChar { it.uppercase() })
-            .addModifiers(KModifier.DATA)
-            .superclass(tabNavigationActionType)
-            .addSuperclassConstructorParameter("route = %S", tabGraph)
             .build()
+    }
 
     /**
      * `NavHost(...) { moduleAGraph(navController); navigation(...) { moduleBGraph(navController); ... } }` -

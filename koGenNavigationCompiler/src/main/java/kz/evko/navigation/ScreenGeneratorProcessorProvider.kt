@@ -155,7 +155,8 @@ internal class ScreenGeneratorProcessor(
                 )
             }
             val graphs = plainGraphs + tabGraphs
-            if (allFunctions.isNotEmpty()) fileGenerator.createRoutes(allFunctions, screenSuffix)
+            if (screenFunctions.isNotEmpty()) fileGenerator.createRoutes(screenFunctions, screenSuffix)
+            if (tabFunctions.isNotEmpty()) fileGenerator.createTabRoutes(tabFunctions, screenSuffix)
 
             // A tab graph resolved locally (never deferred to an aggregator - see BuildMode.Module's
             // own branch below) is either this round's *only* way to end up with a NavHost for it

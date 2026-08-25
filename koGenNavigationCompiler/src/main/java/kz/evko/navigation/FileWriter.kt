@@ -172,11 +172,25 @@ internal class FileWriter(
             .writer().use { it.write(Gson().toJson(manifest)) }
     }
 
-    /** Writes `NavigationRoutes.kt` - every screen across every `navHostName` group gets an `ActionTo<Screen>`. */
+    /** Writes `NavigationRoutes.kt` - every `@KoGenScreen` across every `navHostName` group gets an `ActionTo<Screen> : NavigationAction`. */
     fun createRoutes(screensFunctions: List<KSFunctionDeclaration>, screenSuffix: String?) {
         val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix)
         val fileSpec = routesContentGenerator.generateRoutes(screensFunctions.toList())
         fileSpec.writeToGenerated(screensFunctions)
+    }
+
+    /**
+     * Writes `TabRoutes.kt` - every `@KoGenTab` screen across every `graph` group gets its own
+     * `ActionTo<Screen> : TabNavigationAction`, one per screen (not one per `graph` - a `graph`
+     * groups several sibling tabs into one shared nested graph; switching between them targets each
+     * tab's own route, not the shared graph's route). Generated locally, per module, same as
+     * [createRoutes] - a tab screen's own route is already fully known without waiting for a
+     * `BuildMode.Aggregator` to combine manifests.
+     */
+    fun createTabRoutes(tabFunctions: List<KSFunctionDeclaration>, screenSuffix: String?) {
+        val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix)
+        val fileSpec = routesContentGenerator.generateTabRoutes(tabFunctions.toList())
+        fileSpec.writeToGenerated(tabFunctions)
     }
 
     /** Writes `NavigationExtensions.kt` - the fixed `navigateSafety`/`popBackSafety`/`getResultData` helpers. */

@@ -18,23 +18,25 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import kz.evko.navigation.annotation.KoGenTab
-import kz.evko.navigation.navigation.ActionToHomeTab
-import kz.evko.navigation.navigation.ActionToProfileTab
+import kz.evko.navigation.navigation.ActionToTabHome
+import kz.evko.navigation.navigation.ActionToTabProfile
 import kz.evko.navigation.navigation.AppTabsHost
 import kz.evko.navigation.routes.navigateSafety
 
-// Two single-screen tabs, BuildMode.Single (this module sets no buildMode - the compiler default)
-// - @KoGenTab alone, no @KoGenScreen: verifies a tab screen needs no second annotation, and nests
-// its group into one shared NavHost even with no aggregator/module split at all, combined into the
-// generated AppTabsHost below (tabsHostName's own default). ActionToHomeTab/ActionToProfileTab are
-// generated (per-project route), but navigateSafety(action: TabNavigationAction) itself is the
-// real, hand-written overload from koGenNavigation - not regenerated here.
+// One shared bottom bar, two sibling tabs - both share graph = "mainTabs" (the grouping key), so
+// they nest as siblings inside *one* navigation("mainTabs") { } block, not two separate ones.
+// BuildMode.Single (this module sets no buildMode - the compiler default) - @KoGenTab alone, no
+// @KoGenScreen: verifies a tab screen needs no second annotation, combined into the generated
+// AppTabsHost below (tabsHostName's own default). Each screen still gets its own typed
+// ActionToTabHome/ActionToTabProfile (targeting its own route, not the shared graph's route) - generated
+// per-project - but navigateSafety(action: TabNavigationAction) itself is the real, hand-written
+// overload from koGenNavigation, not regenerated here.
 //
 // Each screen keeps a rememberSaveable counter - not plain remember - specifically to exercise
 // popUpTo(...) { saveState = true } / restoreState = true: plain `remember` state doesn't survive
 // a tab's composition being torn down on switch, only state hooked into the back stack entry's own
 // SavedStateRegistry (which is what rememberSaveable does) does.
-@KoGenTab(graph = "homeTab", startDestination = true)
+@KoGenTab(graph = "mainTabs", startDestination = true)
 @Composable
 fun HomeScreen() {
     var count by rememberSaveable { mutableStateOf(0) }
@@ -44,7 +46,7 @@ fun HomeScreen() {
     }
 }
 
-@KoGenTab(graph = "profileTab", startDestination = true)
+@KoGenTab(graph = "mainTabs")
 @Composable
 fun ProfileScreen() {
     var count by rememberSaveable { mutableStateOf(0) }
@@ -64,14 +66,14 @@ fun TabsDemo() {
             val currentDestination = navController.currentBackStackEntryAsState().value?.destination
             NavigationBar {
                 NavigationBarItem(
-                    selected = currentDestination?.hierarchy?.any { it.route == "homeTab" } == true,
-                    onClick = { navController.navigateSafety(ActionToHomeTab) },
+                    selected = currentDestination?.hierarchy?.any { it.route == "home" } == true,
+                    onClick = { navController.navigateSafety(ActionToTabHome) },
                     icon = {},
                     label = { Text("Home") },
                 )
                 NavigationBarItem(
-                    selected = currentDestination?.hierarchy?.any { it.route == "profileTab" } == true,
-                    onClick = { navController.navigateSafety(ActionToProfileTab) },
+                    selected = currentDestination?.hierarchy?.any { it.route == "profile" } == true,
+                    onClick = { navController.navigateSafety(ActionToTabProfile) },
                     icon = {},
                     label = { Text("Profile") },
                 )

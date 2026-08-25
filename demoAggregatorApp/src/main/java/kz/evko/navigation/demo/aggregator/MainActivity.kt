@@ -14,9 +14,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import kz.evko.navigation.demo.aggregator.navigation.AppNavHost
-import kz.evko.navigation.demo.featurecart.navigation.ActionToCart
+import kz.evko.navigation.demo.featurecart.navigation.ActionToTabCart
 import kz.evko.navigation.demo.featuresettings.navigation.AppTabsHost as SettingsAppTabsHost
-import kz.evko.navigation.helpers.navigateSafety
+import kz.evko.navigation.routes.navigateSafety
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +48,7 @@ private fun DemoRoot() {
         val navController = rememberNavController()
         Column {
             Button(onClick = { showSettingsTab = true }) { Text("Show settings local tab (test)") }
-            Button(onClick = { navController.navigateSafety(ActionToCart(itemCount = 5)) }) {
+            Button(onClick = { navController.navigateSafety(ActionToTabCart(itemCount = 5)) }) {
                 Text("Go to Cart (cross-module test)")
             }
             AppNavHost(modifier = Modifier.weight(1f), navController = navController)

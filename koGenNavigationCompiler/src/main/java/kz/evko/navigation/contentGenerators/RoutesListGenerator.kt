@@ -27,16 +27,42 @@ class RoutesListGenerator(
     private val screenSuffix: String? = null,
 ) {
     private val navigationAction = ClassName("kz.evko.navigation.routes", "NavigationAction")
+    private val tabNavigationAction = ClassName("kz.evko.navigation.routes", "TabNavigationAction")
 
     /**
-     * One `ActionTo<Screen>` per screen in [functionList]: a parameterless `object` for a screen
-     * with no route arguments, otherwise a `class` whose constructor mirrors the screen function's
-     * own arguments and whose `route` is built from them (via [ArgumentTypes], or a Gson-encoded
-     * query parameter for anything [ArgumentTypes] doesn't recognize).
+     * One `ActionTo<Screen>` per screen in [functionList], as [NavigationAction] - see
+     * [generateRoutesFile] for the shape. Written to `NavigationRoutes.kt`.
      */
-    fun generateRoutes(functionList: List<KSFunctionDeclaration>): FileSpec {
+    fun generateRoutes(functionList: List<KSFunctionDeclaration>): FileSpec =
+        generateRoutesFile(functionList, "NavigationRoutes", navigationAction, "ActionTo")
+
+    /**
+     * One `ActionToTab<Screen>` per screen in [functionList], as `TabNavigationAction` instead of
+     * [NavigationAction] - kept structurally unrelated on purpose (see `TabNavigationAction`'s own
+     * doc) so a tab screen's action can never be passed where a plain screen's is expected, or vice
+     * versa. The `ActionToTab` prefix (rather than [generateRoutes]'s own `ActionTo`) is what keeps
+     * the two from colliding by name - a screen and a tab can legitimately share a stripped name
+     * (e.g. two different "Settings" screens, one plain and one a tab). Otherwise identical to
+     * [generateRoutes] - same per-screen route-building - written to its own `TabRoutes.kt`.
+     */
+    fun generateTabRoutes(functionList: List<KSFunctionDeclaration>): FileSpec =
+        generateRoutesFile(functionList, "TabRoutes", tabNavigationAction, "ActionToTab")
+
+    /**
+     * One `<actionPrefix><Screen>` per screen in [functionList]: a parameterless `object` for a
+     * screen with no route arguments, otherwise a `class` whose constructor mirrors the screen
+     * function's own arguments and whose `route` is built from them (via [ArgumentTypes], or a
+     * Gson-encoded query parameter for anything [ArgumentTypes] doesn't recognize) - as a subclass
+     * of [actionSuperclass], written to `$fileName.kt`.
+     */
+    private fun generateRoutesFile(
+        functionList: List<KSFunctionDeclaration>,
+        fileName: String,
+        actionSuperclass: ClassName,
+        actionPrefix: String,
+    ): FileSpec {
         val paramTypes: MutableMap<KSValueParameter, ArgumentTypes> = mutableMapOf()
-        val fileBuilder = FileSpec.builder(packageName, "NavigationRoutes")
+        val fileBuilder = FileSpec.builder(packageName, fileName)
 
         functionList.forEach { function ->
             val params = function.parameters.filter { param ->
@@ -46,9 +72,9 @@ class RoutesListGenerator(
 
             if (params.isEmpty()) {
                 fileBuilder.addType(
-                    TypeSpec.objectBuilder("ActionTo$screenName")
+                    TypeSpec.objectBuilder("$actionPrefix$screenName")
                         .addModifiers(KModifier.DATA)
-                        .superclass(navigationAction)
+                        .superclass(actionSuperclass)
                         .addSuperclassConstructorParameter("route = %S", screenName.lowercase())
                         .build(),
                 )
@@ -84,9 +110,9 @@ class RoutesListGenerator(
                 }
 
                 fileBuilder.addType(
-                    TypeSpec.classBuilder("ActionTo$screenName")
+                    TypeSpec.classBuilder("$actionPrefix$screenName")
                         .primaryConstructor(constructor.build())
-                        .superclass(navigationAction)
+                        .superclass(actionSuperclass)
                         .addSuperclassConstructorParameter("route = %L", "\"$routeTemplate\"")
                         .build(),
                 )
