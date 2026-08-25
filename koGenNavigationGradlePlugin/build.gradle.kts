@@ -1,9 +1,9 @@
 plugins {
     `java-gradle-plugin`
     alias(libs.plugins.jetbrains.kotlin.jvm)
-    alias(libs.plugins.jreleaser)
     id("maven-publish")
     id("signing")
+    alias(libs.plugins.gradle.plugin.publish)
 }
 
 group = project.properties["GROUP"].toString()
@@ -20,6 +20,8 @@ kotlin {
 }
 
 gradlePlugin {
+    website.set("https://github.com/KoGen-libs/KoGen-Navigation")
+    vcsUrl.set("https://github.com/KoGen-libs/KoGen-Navigation")
     plugins {
         create("koGenNavigation") {
             id = "io.github.eugenprog.kogen-navigation"
@@ -27,6 +29,7 @@ gradlePlugin {
             description = "Typed Gradle DSL for the KoGen Navigation KSP compiler - " +
                 "replaces string-based ksp { arg(...) } options with a real koGenNavigation { } block."
             implementationClass = "kz.evko.navigation.gradle.KoGenNavigationPlugin"
+            tags = listOf("android", "compose", "navigation", "ksp", "codegen")
         }
     }
 }
@@ -78,12 +81,6 @@ dependencies {
     // compileOnly/runtime classpath deliberately (see KoGenNavigationPlugin's doc comment).
     testImplementation(libs.symbol.processing.gradle.plugin)
     testImplementation("org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.kotlin.get()}")
-
-    constraints {
-        implementation("org.apache.commons:commons-compress:1.26.2") {
-            because("JReleaser requires this version to avoid a conflict")
-        }
-    }
 }
 
 tasks.test {
@@ -104,7 +101,7 @@ publishing {
         pom {
             name.set("KoGen Navigation Gradle Plugin")
             description.set("Typed Gradle DSL for the KoGen Navigation KSP compiler")
-            url.set("https://github.com/EugenProg/KoGen-navigation_demo")
+            url.set("https://github.com/KoGen-libs/KoGen-Navigation")
 
             licenses {
                 license {

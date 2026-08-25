@@ -1,7 +1,6 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
-    alias(libs.plugins.jreleaser)
     id("maven-publish")
     id("signing")
 }
@@ -47,12 +46,6 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
-
-    constraints {
-        implementation("org.apache.commons:commons-compress:1.26.2") {
-            because("JReleaser requires this version to avoid a conflict")
-        }
-    }
 }
 
 tasks.withType<Test> {
@@ -73,7 +66,7 @@ afterEvaluate {
                 pom {
                     name.set("KoGen Navigation")
                     description.set("A library for navigation in compose")
-                    url.set("https://github.com/EugenProg/KoGen-navigation_demo")
+                    url.set("https://github.com/KoGen-libs/KoGen-Navigation")
 
                     licenses {
                         license {
