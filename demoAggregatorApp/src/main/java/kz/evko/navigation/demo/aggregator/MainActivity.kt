@@ -16,7 +16,7 @@ import androidx.navigation.compose.rememberNavController
 import kz.evko.navigation.demo.aggregator.navigation.AppNavHost
 import kz.evko.navigation.demo.featurecart.navigation.ActionToTabCart
 import kz.evko.navigation.demo.featuresettings.navigation.AppTabsHost as SettingsAppTabsHost
-import kz.evko.navigation.routes.navigateSafety
+import kz.evko.navigation.helpers.navigateSafety
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
