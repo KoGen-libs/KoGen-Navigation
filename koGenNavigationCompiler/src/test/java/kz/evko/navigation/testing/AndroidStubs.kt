@@ -130,8 +130,9 @@ internal val androidStubSources: List<SourceFile> = listOf(
             fun <T> remove(key: String): T? = null
         }
 
-        class NavDestination {
+        open class NavDestination {
             val route: String? = null
+            val id: Int = 0
         }
 
         class NavBackStackEntry {
@@ -172,16 +173,30 @@ internal val androidStubSources: List<SourceFile> = listOf(
 
         class PopUpToBuilder {
             var inclusive: Boolean = false
+            var saveState: Boolean = false
         }
 
         class NavOptionsBuilder {
+            var launchSingleTop: Boolean = false
+            var restoreState: Boolean = false
             fun popUpTo(route: String, builder: PopUpToBuilder.() -> Unit) {}
+            fun popUpTo(id: Int, builder: PopUpToBuilder.() -> Unit) {}
+        }
+
+        class NavGraph : NavDestination() {
+            // Real shape: findStartDestination() lives in NavGraph's own companion, not as a
+            // plain top-level function - a generator importing it the "obvious" wrong way
+            // (as if it were top-level) fails silently against the real library; catch that here.
+            companion object {
+                fun NavGraph.findStartDestination(): NavDestination = this
+            }
         }
 
         class NavHostController {
             val previousBackStackEntry: NavBackStackEntry? = null
             val currentBackStackEntry: NavBackStackEntry? = null
             val currentDestination: NavDestination? = null
+            val graph: NavGraph = NavGraph()
 
             fun navigate(route: String, builder: NavOptionsBuilder.() -> Unit = {}) {}
             fun popBackStack() {}
@@ -216,6 +231,13 @@ internal val androidStubSources: List<SourceFile> = listOf(
             modifier: Modifier = Modifier,
             navController: NavHostController,
             startDestination: String,
+            builder: NavGraphBuilder.() -> Unit,
+        ) {
+        }
+
+        fun NavGraphBuilder.navigation(
+            startDestination: String,
+            route: String,
             builder: NavGraphBuilder.() -> Unit,
         ) {
         }

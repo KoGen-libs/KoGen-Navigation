@@ -52,13 +52,16 @@ internal class FileWriter(
     }
 
     /**
-     * Writes `<name>NavigationScreens.kt` for one `navHostName` group, then its graph via
-     * [createGraph]. No-ops for an empty group.
+     * Writes `<name>NavigationScreens.kt` for one `navHostName`/[KoGenTab.graph] group, then its
+     * graph via [createGraph]. No-ops for an empty group.
      *
+     * @param annotationClass `KoGenScreen::class` for a plain group, `KoGenTab::class` for a tab.
+     * @param isTab Whether this group is a tab (grouped by `@KoGenTab(graph = name)`) rather than a
+     *   plain one (grouped by `@KoGenScreen(navHostName = name)`).
      * @return This group's [GraphManifestEntry] - for [createManifest] to report, in
      *   [BuildMode.Module], or for [createAggregatedNavHost] to call directly alongside every
-     *   other module's, in [BuildMode.Aggregator]. `null` for [BuildMode.Single] (which has no use
-     *   for one) or an empty group.
+     *   other module's, in [BuildMode.Aggregator]. `null` for a plain group in [BuildMode.Single]
+     *   (which has no use for one) or an empty group.
      */
     fun createScreensList(
         screensFunctions: List<KSFunctionDeclaration>,
@@ -67,6 +70,8 @@ internal class FileWriter(
         defaultAnimation: NavigationAnimation,
         screenSuffix: String?,
         buildMode: BuildMode,
+        annotationClass: KClass<*>,
+        isTab: Boolean,
     ): GraphManifestEntry? {
         if (!screensFunctions.iterator().hasNext()) return null
 
@@ -86,16 +91,24 @@ internal class FileWriter(
             defaultAnimation = defaultAnimation,
             screenSuffix = screenSuffix,
             buildMode = buildMode,
+            annotationClass = annotationClass,
+            isTab = isTab,
         )
     }
 
     /**
-     * Writes this group's graph: `<name>.kt` (a self-contained `NavHost`) for [BuildMode.Single],
-     * or `<name>Graph.kt` (a `NavGraphBuilder` extension - see
-     * [NavHostContentGenerator.generateGraphExtension]) for [BuildMode.Module]/[BuildMode.Aggregator]
-     * - an aggregator's own local screens (if it has any) need to end up callable from *its own*
-     * combined `NavHost` exactly the same way every other module's do, not a second, rival
-     * self-contained one under the same default name.
+     * Writes this group's graph: `<name>.kt` (a self-contained `NavHost`) for a plain group in
+     * [BuildMode.Single], or `<name>Graph.kt` (a `NavGraphBuilder` extension - see
+     * [NavHostContentGenerator.generateGraphExtension]) otherwise - [BuildMode.Module]/[BuildMode.Aggregator]
+     * always (an aggregator's own local screens, if it has any, need to end up callable from *its
+     * own* combined `NavHost` exactly the same way every other module's do, not a second, rival
+     * self-contained one under the same default name), and any tab group regardless of build mode
+     * - a tab is always nested inside a shared `NavHost` (see [createLocalTabbedNavHost]/
+     * `createAggregatedNavHost`), never its own separate one.
+     *
+     * @return `null` for a plain group in [BuildMode.Single] (which has no use for a manifest
+     *   entry) or an empty group - a real entry otherwise, [GraphManifestEntry.tabGraph] set to
+     *   [name] when [isTab].
      */
     private fun createGraph(
         screensFunctions: List<KSFunctionDeclaration>,
@@ -104,10 +117,12 @@ internal class FileWriter(
         defaultAnimation: NavigationAnimation,
         screenSuffix: String?,
         buildMode: BuildMode,
+        annotationClass: KClass<*>,
+        isTab: Boolean,
     ): GraphManifestEntry? {
         val navHostContentGenerator = NavHostContentGenerator(packageName, screenSuffix, logger)
 
-        if (buildMode == BuildMode.Single) {
+        if (buildMode == BuildMode.Single && !isTab) {
             navHostContentGenerator.generateNavHost(
                 functionList = screensFunctions.toList(),
                 hostName = name,
@@ -122,9 +137,10 @@ internal class FileWriter(
             hostName = name,
             viewModelInjector = viewModelInjector,
             defaultAnimation = defaultAnimation,
+            annotationClass = annotationClass,
         ).writeToGenerated(screensFunctions)
 
-        val startDestination = screensFunctions.findPreferredStartDestination()
+        val startDestination = screensFunctions.findPreferredStartDestination(annotationClass, logger)
         return GraphManifestEntry(
             graphFunctionName = "${name}Graph",
             screens = screensFunctions.map { function ->
@@ -134,6 +150,7 @@ internal class FileWriter(
                     isStartDestination = function == startDestination,
                 )
             },
+            tabGraph = if (isTab) name else null,
         )
     }
 
@@ -155,11 +172,25 @@ internal class FileWriter(
             .writer().use { it.write(Gson().toJson(manifest)) }
     }
 
-    /** Writes `NavigationRoutes.kt` - every screen across every `navHostName` group gets an `ActionTo<Screen>`. */
+    /** Writes `NavigationRoutes.kt` - every `@KoGenScreen` across every `navHostName` group gets an `ActionTo<Screen> : NavigationAction`. */
     fun createRoutes(screensFunctions: List<KSFunctionDeclaration>, screenSuffix: String?) {
         val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix)
         val fileSpec = routesContentGenerator.generateRoutes(screensFunctions.toList())
         fileSpec.writeToGenerated(screensFunctions)
+    }
+
+    /**
+     * Writes `TabRoutes.kt` - every `@KoGenTab` screen across every `graph` group gets its own
+     * `ActionTo<Screen> : TabNavigationAction`, one per screen (not one per `graph` - a `graph`
+     * groups several sibling tabs into one shared nested graph; switching between them targets each
+     * tab's own route, not the shared graph's route). Generated locally, per module, same as
+     * [createRoutes] - a tab screen's own route is already fully known without waiting for a
+     * `BuildMode.Aggregator` to combine manifests.
+     */
+    fun createTabRoutes(tabFunctions: List<KSFunctionDeclaration>, screenSuffix: String?) {
+        val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix)
+        val fileSpec = routesContentGenerator.generateTabRoutes(tabFunctions.toList())
+        fileSpec.writeToGenerated(tabFunctions)
     }
 
     /** Writes `NavigationExtensions.kt` - the fixed `navigateSafety`/`popBackSafety`/`getResultData` helpers. */
@@ -167,6 +198,27 @@ internal class FileWriter(
         // No screen name to strip a suffix from here - generateExtensions() doesn't use it.
         val routesContentGenerator = RoutesListGenerator(packageName, screenSuffix = null)
         routesContentGenerator.generateExtensions().writeToGenerated(emptyList())
+    }
+
+    /**
+     * Writes `<hostName>.kt` - a `NavHost` combining [tabGraphs] (this KSP round's own tab-tagged
+     * `navHostName` groups - never deferred to a `BuildMode.Aggregator`, either because this is
+     * [BuildMode.Single] or because the `shareTabGraph` KSP option is `false` in [BuildMode.Module])
+     * into one shared graph - exactly what `createAggregatedNavHost` does across modules, just from
+     * this round's own in-memory graphs: nothing here ever crossed a module boundary, so there's no
+     * manifest file to read back for it. No-ops if [tabGraphs] is empty.
+     */
+    fun createLocalTabbedNavHost(hostName: String, tabGraphs: List<GraphManifestEntry>) {
+        if (tabGraphs.isEmpty()) return
+
+        val manifest = ModuleManifest(module = "(this module)", packageName = packageName, graphs = tabGraphs)
+        val validator = ManifestValidator(listOf(manifest), logger)
+        AggregatorContentGenerator(packageName).generateAppNavHost(
+            manifests = listOf(manifest),
+            hostName = hostName,
+            startDestinationRoute = validator.resolveStartDestinationRoute(),
+            tabStartDestinations = validator.resolveTabStartDestinations(),
+        ).writeToGenerated(emptyList())
     }
 
     /**
@@ -221,6 +273,7 @@ internal class FileWriter(
             manifests = manifests,
             hostName = hostName,
             startDestinationRoute = validator.resolveStartDestinationRoute(),
+            tabStartDestinations = validator.resolveTabStartDestinations(),
         ).writeToGenerated(emptyList())
     }
 

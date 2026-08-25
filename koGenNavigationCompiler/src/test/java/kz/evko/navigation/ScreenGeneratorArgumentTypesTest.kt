@@ -60,7 +60,14 @@ class ScreenGeneratorArgumentTypesTest {
         assertTrue(navHost.contains("type = NavType.FloatType"))
 
         assertTrue(navHost.contains("flag = it.arguments?.getBoolean(\"flag\") ?: false,"))
-        assertTrue(navHost.contains("name = it.arguments?.getString(\"name\").orEmpty(),"))
+        // A String argument is URL-decoded right after reading it back - RoutesListGenerator
+        // URL-encodes it the same way before ever embedding it in the route (see that class's own
+        // regression test), so a value containing a route-special character round-trips exactly.
+        assertTrue(
+            navHost.contains(
+                "name = it.arguments?.getString(\"name\")?.let { raw -> java.net.URLDecoder.decode(raw, \"UTF-8\") }.orEmpty(),",
+            ),
+        )
         assertTrue(navHost.contains("count = it.arguments?.getInt(\"count\") ?: 0,"))
         assertTrue(navHost.contains("total = it.arguments?.getLong(\"total\") ?: 0,"))
         // Regression check: this used to generate "?: 0" (an untyped Int literal), which fails to
@@ -128,7 +135,8 @@ class ScreenGeneratorArgumentTypesTest {
         val navHost = result.generatedFile("AppNavHost.kt")
         assertTrue(
             navHost.contains(
-                "profile = it.arguments?.getString(\"profile\").orEmpty().let { json -> Gson().fromJson<test.app.screens.UserProfile>" +
+                "profile = it.arguments?.getString(\"profile\")?.let { raw -> java.net.URLDecoder.decode(raw, \"UTF-8\") }" +
+                    ".orEmpty().let { json -> Gson().fromJson<test.app.screens.UserProfile>" +
                     "(json, object : com.google.gson.reflect.TypeToken<test.app.screens.UserProfile>() {}.type) },",
             ),
         )
@@ -138,7 +146,10 @@ class ScreenGeneratorArgumentTypesTest {
         // above, which is still built as raw text - see the "KotlinPoet migration" tasks).
         assertTrue(routes.contains("import test.app.screens.UserProfile"))
         assertTrue(routes.contains("profile: UserProfile,"))
-        assertTrue(routes.contains("profile=\${com.google.gson.Gson().toJson(profile)}"))
+        // URL-encoded: the Gson JSON blob itself can contain a route-special character (`&`
+        // above all) just as easily as a plain String value can - see ArgumentTypes' own
+        // regression test for what happens to the rest of the route when it isn't.
+        assertTrue(routes.contains("profile=\${java.net.URLEncoder.encode(com.google.gson.Gson().toJson(profile), \"UTF-8\")}"))
     }
 
     @Test
@@ -167,7 +178,8 @@ class ScreenGeneratorArgumentTypesTest {
         val navHost = result.generatedFile("AppNavHost.kt")
         assertTrue(
             navHost.contains(
-                "profile = it.arguments?.getString(\"profile\")?.let { json -> Gson().fromJson<test.app.screens.UserProfile>" +
+                "profile = it.arguments?.getString(\"profile\")?.let { raw -> java.net.URLDecoder.decode(raw, \"UTF-8\") }" +
+                    "?.let { json -> Gson().fromJson<test.app.screens.UserProfile>" +
                     "(json, object : com.google.gson.reflect.TypeToken<test.app.screens.UserProfile>() {}.type) },",
             ),
         )
@@ -203,7 +215,8 @@ class ScreenGeneratorArgumentTypesTest {
         val navHost = result.generatedFile("AppNavHost.kt")
         assertTrue(
             navHost.contains(
-                "profiles = it.arguments?.getString(\"profiles\").orEmpty().let { json -> Gson().fromJson<kotlin.collections.List<test.app.screens.UserProfile>>" +
+                "profiles = it.arguments?.getString(\"profiles\")?.let { raw -> java.net.URLDecoder.decode(raw, \"UTF-8\") }" +
+                    ".orEmpty().let { json -> Gson().fromJson<kotlin.collections.List<test.app.screens.UserProfile>>" +
                     "(json, object : com.google.gson.reflect.TypeToken<kotlin.collections.List<test.app.screens.UserProfile>>() {}.type) },",
             ),
         )

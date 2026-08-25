@@ -39,6 +39,8 @@ class KoGenNavigationPlugin : Plugin<Project> {
         extension.moduleName.convention(project.name)
         extension.manifestVariant.convention("debug")
         extension.aggregateHostName.convention("AppNavHost")
+        extension.tabsHostName.convention("AppTabsHost")
+        extension.shareTabGraph.convention(true)
 
         // Dependencies are added as soon as KSP is applied (via withPlugin), not deferred to
         // afterEvaluate - deferring it that late was a real bug found while verifying this
@@ -80,9 +82,13 @@ class KoGenNavigationPlugin : Plugin<Project> {
             ksp.arg("buildMode", buildMode.argName)
 
             when (buildMode) {
-                BuildMode.Single -> Unit
+                BuildMode.Single -> {
+                    ksp.arg("tabsHostName", extension.tabsHostName.get())
+                }
                 BuildMode.Module -> {
                     ksp.arg("moduleName", extension.moduleName.get())
+                    ksp.arg("shareTabGraph", extension.shareTabGraph.get().toString())
+                    ksp.arg("tabsHostName", extension.tabsHostName.get())
                     registerManifestProducer(project, extension)
                 }
                 BuildMode.Aggregator -> {

@@ -20,6 +20,7 @@ import kz.evko.navigation.helpers.NavigationAnimation
 import kz.evko.navigation.helpers.ViewModelInjector
 import kz.evko.navigation.replaceScreenWord
 import kz.evko.navigation.stringListAnnotationParameterByName
+import kotlin.reflect.KClass
 
 /**
  * Builds the `@Composable fun <hostName>(navController, ...)` file for one group of screens
@@ -52,9 +53,7 @@ internal class NavHostContentGenerator(
         defaultAnimation: NavigationAnimation,
     ): FileSpec {
         val screensEnum = ClassName(packageName, "${hostName}NavigationScreens")
-        val startDestination = functionList.firstOrNull {
-            it.booleanAnnotationParameterByName(KoGenScreen::class, "startDestination")
-        } ?: functionList.first()
+        val startDestination = functionList.findPreferredStartDestination(KoGenScreen::class) ?: functionList.first()
         val startDestinationName = startDestination.toString().replaceScreenWord(screenSuffix)
 
         val hostFunction = FunSpec.builder(hostName)
@@ -66,7 +65,7 @@ internal class NavHostContentGenerator(
                     .defaultValue("%T.%L.route", screensEnum, startDestinationName)
                     .build(),
             )
-            .addCode(generateNavHostBody(functionList, hostName, viewModelInjector, defaultAnimation))
+            .addCode(generateNavHostBody(functionList, hostName, viewModelInjector, defaultAnimation, KoGenScreen::class))
             .build()
 
         // ArgumentTypes'/AnimationType's generated fragments still reference these three by their
@@ -99,12 +98,13 @@ internal class NavHostContentGenerator(
         hostName: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
+        annotationClass: KClass<*>,
     ): FileSpec {
         val graphName = "${hostName}Graph"
         val graphFunction = FunSpec.builder(graphName)
             .receiver(navGraphBuilderType)
             .addParameter("navController", navHostControllerType)
-            .addCode(generateScreenComposables(functionList, hostName, viewModelInjector, defaultAnimation))
+            .addCode(generateScreenComposables(functionList, hostName, viewModelInjector, defaultAnimation, annotationClass))
             .build()
 
         return FileSpec.builder(packageName, graphName)
@@ -121,12 +121,13 @@ internal class NavHostContentGenerator(
         hostName: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
+        annotationClass: KClass<*>,
     ): CodeBlock = CodeBlock.builder()
         .beginControlFlow(
             "%M(modifier = modifier, navController = navController, startDestination = startDestination)",
             navHostMember,
         )
-        .apply { append(functionList, hostName, viewModelInjector, defaultAnimation) }
+        .apply { append(functionList, hostName, viewModelInjector, defaultAnimation, annotationClass) }
         .endControlFlow()
         .build()
 
@@ -136,8 +137,9 @@ internal class NavHostContentGenerator(
         hostName: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
+        annotationClass: KClass<*>,
     ): CodeBlock = CodeBlock.builder()
-        .apply { append(functionList, hostName, viewModelInjector, defaultAnimation) }
+        .apply { append(functionList, hostName, viewModelInjector, defaultAnimation, annotationClass) }
         .build()
 
     private fun CodeBlock.Builder.append(
@@ -145,9 +147,10 @@ internal class NavHostContentGenerator(
         hostName: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
+        annotationClass: KClass<*>,
     ) {
         functionList.forEach { function ->
-            addScreenComposable(function, hostName, viewModelInjector, defaultAnimation)
+            addScreenComposable(function, hostName, viewModelInjector, defaultAnimation, annotationClass)
         }
     }
 
@@ -161,14 +164,15 @@ internal class NavHostContentGenerator(
         hostName: String,
         viewModelInjector: ViewModelInjector,
         defaultAnimation: NavigationAnimation,
+        annotationClass: KClass<*>,
     ): CodeBlock.Builder {
         val screensEnum = ClassName(packageName, "${hostName}NavigationScreens")
         val screenEntryName = function.toString().replaceScreenWord(screenSuffix)
         val screenFunction = MemberName(function.packageName.asString(), function.simpleName.asString())
         val params = function.parameters.filter { !it.isNavHostController() && !it.isViewModel() }
-        val animation = function.getAnimationType(defaultAnimation).type.buildAnimationContent()
-        val deepLinks = function.stringListAnnotationParameterByName(KoGenScreen::class, "deepLinks")
-        warnAboutUnknownDeepLinkPlaceholders(deepLinks, params, screenEntryName)
+        val animation = function.getAnimationType(defaultAnimation, annotationClass).type.buildAnimationContent()
+        val deepLinks = function.stringListAnnotationParameterByName(annotationClass, "deepLinks")
+        warnAboutUnknownDeepLinkPlaceholders(deepLinks, params, screenEntryName, annotationClass)
 
         add("%M(\n", composableMember)
         indent()
@@ -215,6 +219,7 @@ internal class NavHostContentGenerator(
         deepLinks: List<String>,
         params: List<KSValueParameter>,
         screenEntryName: String,
+        annotationClass: KClass<*>,
     ) {
         if (deepLinks.isEmpty()) return
         val paramNames = params.mapNotNull { it.name?.asString() }.toSet()
@@ -222,7 +227,7 @@ internal class NavHostContentGenerator(
             deepLinkPlaceholder.findAll(pattern).map { it.groupValues[1] }.forEach { placeholder ->
                 if (placeholder !in paramNames) {
                     logger.warn(
-                        "@KoGenScreen deepLinks: '{$placeholder}' in \"$pattern\" for screen " +
+                        "@${annotationClass.simpleName} deepLinks: '{$placeholder}' in \"$pattern\" for screen " +
                             "'$screenEntryName' does not match any of its parameters " +
                             "(${paramNames.ifEmpty { setOf("<none>") }})",
                     )
@@ -270,22 +275,30 @@ internal class NavHostContentGenerator(
 }
 
 /**
- * The one function in [this] flagged `@KoGenScreen(startDestination = true)`, or `null` if none
- * is - unlike [generateNavHost]'s own `startDestination` default, which always falls back to the
- * first screen, this has no such fallback: it's used to report a module's *own* preference to a
- * manifest, and "nothing preferred" is a real, valid answer there (an aggregator combining
- * several modules picks its overall start destination from whoever did express one, deterministically).
+ * The one function in [this] flagged `startDestination = true` on [annotationClass] (`@KoGenScreen`
+ * for a plain group, `@KoGenTab` for a tab - see its own doc for why that's never the whole app's
+ * own default), or `null` if none is - unlike [generateNavHost]'s own `startDestination` default,
+ * which always falls back to the first screen, this has no such fallback: it's used to report a
+ * group's *own* preference to a manifest, and "nothing preferred" is a real, valid answer there (an
+ * aggregator combining several modules picks its overall start destination from whoever did
+ * express one, deterministically). More than one flagged screen in the same group can't fail the
+ * build either - a helper library never should over a preference conflict it can resolve
+ * deterministically on its own - the first one wins, the rest are reported via [logger] as a warning.
  */
-fun List<KSFunctionDeclaration>.findPreferredStartDestination(): KSFunctionDeclaration? =
-    firstOrNull { it.booleanAnnotationParameterByName(KoGenScreen::class, "startDestination") }
+fun List<KSFunctionDeclaration>.findPreferredStartDestination(
+    annotationClass: KClass<*>,
+    logger: KSPLogger? = null,
+): KSFunctionDeclaration? {
+    val flagged = filter { it.booleanAnnotationParameterByName(annotationClass, "startDestination") }
+    if (flagged.size > 1) {
+        logger?.warn("@${annotationClass.simpleName}: more than one startDestination = true in the same group - using the first.")
+    }
+    return flagged.firstOrNull()
+}
 
 /** This screen's own `animation`, or [defaultAnimation] if it left it unset ([NavigationAnimation.None]). */
-fun KSFunctionDeclaration.getAnimationType(defaultAnimation: NavigationAnimation): NavigationAnimation {
-    val animationName = "animation"
-    val animationType = this.annotationParameterByName(
-        KoGenScreen::class,
-        animationName,
-    )
+fun KSFunctionDeclaration.getAnimationType(defaultAnimation: NavigationAnimation, annotationClass: KClass<*>): NavigationAnimation {
+    val animationType = this.annotationParameterByName(annotationClass, "animation")
     val screenAnimationType = NavigationAnimation.entries.firstOrNull {
         it.name == animationType
     } ?: NavigationAnimation.None

@@ -1,7 +1,6 @@
 plugins {
     id("java-library")
     alias(libs.plugins.jetbrains.kotlin.jvm)
-    alias(libs.plugins.jreleaser)
     id("maven-publish")
     id("signing")
 }
@@ -23,12 +22,6 @@ dependencies {
     testImplementation(platform(libs.junit.bom))
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
-
-    constraints {
-        implementation("org.apache.commons:commons-compress:1.26.2") {
-            because("JReleaser requires this version to avoid a conflict")
-        }
-    }
 }
 
 tasks.test {
@@ -46,7 +39,7 @@ publishing {
             pom {
                 name.set("KoGen Navigation Common")
                 description.set("Shared annotation and types used by both the KoGen Navigation runtime and its KSP compiler")
-                url.set("https://github.com/EugenProg/KoGen-navigation_demo")
+                url.set("https://github.com/KoGen-libs/KoGen-Navigation")
 
                 licenses {
                     license {

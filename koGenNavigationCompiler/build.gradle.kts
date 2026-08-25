@@ -1,7 +1,6 @@
 plugins {
     id("java-library")
     alias(libs.plugins.jetbrains.kotlin.jvm)
-    alias(libs.plugins.jreleaser)
     id("maven-publish")
     id("signing")
 }
@@ -34,12 +33,6 @@ dependencies {
     testRuntimeOnly(libs.junit.platform.launcher)
     testImplementation(libs.kotlin.compile.testing)
     testImplementation(libs.kotlin.compile.testing.ksp)
-
-    constraints {
-        implementation("org.apache.commons:commons-compress:1.26.2") {
-            because("JReleaser requires this version to avoid a conflict")
-        }
-    }
 }
 
 tasks.test {
@@ -66,7 +59,7 @@ publishing {
             pom {
                 name.set("KoGen Navigation Compiler")
                 description.set("KSP symbol processor that generates the compose navigation code for KoGen Navigation")
-                url.set("https://github.com/EugenProg/KoGen-navigation_demo")
+                url.set("https://github.com/KoGen-libs/KoGen-Navigation")
 
                 licenses {
                     license {

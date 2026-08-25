@@ -32,11 +32,15 @@ android {
 // 2.0 multi-module demo, module side - a third module, added specifically to verify the
 // aggregator mechanism scales past a pair (see demoFeatureLogin's build.gradle.kts for why this
 // is raw ksp { arg(...) } rather than the koGenNavigation Gradle plugin).
+// shareTabGraph = false - verifies the "not combined by an aggregator" path of @KoGenTab: this
+// module builds its own tab locally (tabsHostName default "AppTabsHost") instead of reporting it
+// to demoAggregatorApp's manifest - see SettingsScreen.kt.
 ksp {
     arg("buildMode", "module")
     arg("moduleName", "demoFeatureSettings")
     arg("packageName", "kz.evko.navigation.demo.featuresettings")
     arg("screenSuffix", "Screen")
+    arg("shareTabGraph", "false")
 }
 
 dependencies {

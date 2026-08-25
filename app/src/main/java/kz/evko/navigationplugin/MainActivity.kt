@@ -16,6 +16,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -26,20 +30,41 @@ import androidx.navigation.compose.rememberNavController
 import kz.evko.navigation.annotation.KoGenScreen
 import kz.evko.navigation.helpers.BackStackData
 import kz.evko.navigation.helpers.NavigationResultKey
+import kz.evko.navigation.helpers.getResultData
+import kz.evko.navigation.helpers.navigateSafety
+import kz.evko.navigation.helpers.popBackSafety
 import kz.evko.navigation.navigation.ActionToFourth
+import kz.evko.navigation.navigation.ActionToLink
 import kz.evko.navigation.navigation.ActionToSecond
 import kz.evko.navigation.navigation.ActionToThird
 import kz.evko.navigation.navigation.AppNavHost
-import kz.evko.navigation.navigation.getResultData
-import kz.evko.navigation.navigation.navigateSafety
-import kz.evko.navigation.navigation.popBackSafety
+import kz.evko.navigation.navigation.linkTest
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            AppNavHost(navController = rememberNavController())
+            // Toggle so both demos stay reachable in one Activity: the original flat-screen flow
+            // (AppNavHost) and the @KoGenTab nested-graph one (TabsDemo) - see TabsDemo.kt.
+            var showTabsDemo by remember { mutableStateOf(false) }
+            var showLinkTest by remember { mutableStateOf(false) }
+            when {
+                showTabsDemo -> TabsDemo()
+                showLinkTest -> LinkCrashTest()
+                else -> Column(modifier = Modifier.statusBarsPadding()) {
+                    Button(onClick = { showTabsDemo = true }) {
+                        Text("Show tabs demo")
+                    }
+                    Button(onClick = { showLinkTest = true }) {
+                        Text("Test: navigate with a real link as an argument")
+                    }
+                    AppNavHost(
+                        modifier = Modifier.weight(1f),
+                        navController = rememberNavController(),
+                    )
+                }
+            }
         }
     }
 }
@@ -64,7 +89,8 @@ fun MainScreen(
             navController.navigateSafety(
                 ActionToSecond(
                     title = "Второй",
-                )
+                ),
+                null, false
             )
         },
         backClick = {}
@@ -94,7 +120,7 @@ fun SecondScreen(
         },
         backClick = {
             navController.popBackSafety(
-                backStackData = BackStackData(NavigationResultValues.ShowToast, true)
+                BackStackData(NavigationResultValues.ShowToast, true)
             )
         }
     )
@@ -150,6 +176,39 @@ fun FourthScreen(
             navController.popBackSafety()
         }
     )
+}
+
+/**
+ * A real URL, unmodified, as a route argument - `RoutesListGenerator` interpolates a String
+ * argument straight into the route string (`"link?text=$text"`), with no URL-encoding of `text`
+ * first. A real link's own `?`/`&`/`/` land in the route string as literal separator characters,
+ * not just data - this is here to see, on-device, what Navigation Compose actually does with that:
+ * crash, silently truncate/misroute, or - having never needed to before - work by accident.
+ */
+@KoGenScreen(startDestination = true, navHostName = "linkTest")
+@Composable
+fun LinkScreen(navController: NavHostController, link: String) {
+    Text("Received link: \"$link\"")
+}
+
+@Composable
+fun LinkCrashTest() {
+    val navController = rememberNavController()
+    val cases = listOf(
+        "plain-no-special-chars",
+        "has/a/slash",
+        "has?a-question-mark",
+        "has&an-ampersand",
+        "https://example.com/path?foo=1&bar=2",
+    )
+    Column(modifier = Modifier.statusBarsPadding()) {
+        cases.forEach { value ->
+            Button(onClick = { navController.navigateSafety(ActionToLink(link = value)) }) {
+                Text("Navigate with: $value")
+            }
+        }
+        linkTest(modifier = Modifier.weight(1f), navController = navController)
+    }
 }
 
 @Composable

@@ -8,6 +8,12 @@ package kz.evko.navigation.manifest
 data class ScreenManifestEntry(
     val route: String,
     val name: String,
+    /**
+     * Whether this screen is its own group's `startDestination` - for a plain group
+     * ([GraphManifestEntry.tabGraph] `null`), that group's own preferred app-wide default; for a
+     * tab group, that tab's own entry point instead (see `@KoGenTab`) - which of the two a given
+     * [GraphManifestEntry] means is entirely determined by whether it set [GraphManifestEntry.tabGraph].
+     */
     val isStartDestination: Boolean,
 )
 
@@ -19,6 +25,14 @@ data class ScreenManifestEntry(
 data class GraphManifestEntry(
     val graphFunctionName: String,
     val screens: List<ScreenManifestEntry>,
+    /**
+     * The tab this `navHostName` group is nested under (see `@KoGenTab`), or `null` for
+     * a plain, non-nested group - unchanged, flat behavior. An aggregator (or a module resolving
+     * its own tab locally - see the `shareTabGraph` KSP option) groups every [GraphManifestEntry]
+     * sharing the same non-null [tabGraph] - however many modules it's split across - into one
+     * `navigation(route = tabGraph, startDestination = ...) { }` block.
+     */
+    val tabGraph: String? = null,
 )
 
 /**
