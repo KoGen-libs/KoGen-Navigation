@@ -3,9 +3,11 @@ package kz.evko.navigation.helpers
 import android.util.Log
 import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.intl.Locale
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import kz.evko.navigation.routes.NavigationAction
 import kz.evko.navigation.routes.RouteScreenType
+import kz.evko.navigation.routes.TabNavigationAction
 import kz.evko.navigation.routes.navigationBackLog
 import kz.evko.navigation.routes.navigationLog
 
@@ -29,6 +31,27 @@ public fun NavHostController.navigateSafety(
                 this.inclusive = inclusive
             }
         }
+    }
+}
+
+/**
+ * Switches to [action]'s tab, preserving its own back stack/scroll position - Google's own
+ * recommended bottom-navigation recipe (`popUpTo` the graph's own start with `saveState`, plus
+ * `launchSingleTop`/`restoreState`), applied once here rather than by hand at every tab-bar
+ * `onClick`.
+ *
+ * Overloads the same name the [NavigationAction] variant above uses - one call to remember
+ * regardless of what's being navigated to; Kotlin resolves the right one from [TabNavigationAction]
+ * and [NavigationAction] being unrelated types, the same way it always resolves an overload by
+ * argument type.
+ */
+public fun NavHostController.navigateSafety(action: TabNavigationAction) {
+    navigate(action.route) {
+        popUpTo(graph.findStartDestination().id) {
+            saveState = true
+        }
+        launchSingleTop = true
+        restoreState = true
     }
 }
 

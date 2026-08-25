@@ -21,7 +21,7 @@ import kz.evko.navigation.annotation.KoGenTab
 import kz.evko.navigation.navigation.ActionToTabHome
 import kz.evko.navigation.navigation.ActionToTabProfile
 import kz.evko.navigation.navigation.AppTabsHost
-import kz.evko.navigation.routes.navigateSafety
+import kz.evko.navigation.helpers.navigateSafety
 
 // One shared bottom bar, two sibling tabs - both share graph = "mainTabs" (the grouping key), so
 // they nest as siblings inside *one* navigation("mainTabs") { } block, not two separate ones.

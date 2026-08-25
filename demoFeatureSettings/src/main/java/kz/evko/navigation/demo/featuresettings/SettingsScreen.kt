@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.NavHostController
 import kz.evko.navigation.annotation.KoGenTab
 import kz.evko.navigation.demo.featuresettings.navigation.ActionToTabSettingsDetails
-import kz.evko.navigation.routes.navigateSafety
+import kz.evko.navigation.helpers.navigateSafety
 
 // @KoGenTab alone, no @KoGenScreen - shareTabGraph = false (see this module's build.gradle.kts) -
 // this tab is meant to be fully self-contained here, never combined by demoAggregatorApp, so it's
